@@ -1,0 +1,105 @@
+use apisdk::{
+    send, AccessTokenSignature, ApiResult, CodeDataMessage, HashedTokenSignature, SignatureTrait,
+};
+use base64::{engine::general_purpose, Engine};
+
+use crate::common::{init_logger, start_server, Payload, TheApi};
+
+mod common;
+
+impl TheApi {
+    async fn touch(&self) -> ApiResult<Payload> {
+        let req = self.get("/path/json").await?;
+        send!(req, CodeDataMessage).await
+    }
+}
+
+#[tokio::test]
+async fn test_access_token_auth_fixed() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::builder()
+        .with_signature(AccessTokenSignature::new("fixed"))
+        .build();
+
+    let res = api.touch().await?;
+    log::debug!("res = {:?}", res);
+    let auth = res.headers.get("authorization").unwrap();
+    assert_eq!("Bearer fixed", auth);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_access_token_auth_dynamic() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::builder()
+        .with_signature(AccessTokenSignature::new_dynamic(|| Ok("dynamic")))
+        .build();
+
+    let res = api.touch().await?;
+    log::debug!("res = {:?}", res);
+    let auth = res.headers.get("authorization").unwrap();
+    assert_eq!("Bearer dynamic", auth);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_access_token_auth_in_header() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::builder()
+        .with_signature(AccessTokenSignature::new("fixed").with_header_name("x-auth"))
+        .build();
+
+    let res = api.touch().await?;
+    log::debug!("res = {:?}", res);
+    let auth = res.headers.get("x-auth").unwrap();
+    assert_eq!("fixed", auth);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_access_token_auth_in_query() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::builder()
+        .with_signature(AccessTokenSignature::new("fixed").with_query_param("x-auth"))
+        .build();
+
+    let res = api.touch().await?;
+    log::debug!("res = {:?}", res);
+    let auth = res.query.get("x-auth").unwrap();
+    assert_eq!("fixed", auth);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_hashed_token_auth() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::builder()
+        .with_signature(HashedTokenSignature::new("app_id", "app_secret"))
+        .build();
+
+    let res = api.touch().await?;
+    log::debug!("res = {:?}", res);
+    let auth = res.headers.get("authorization").unwrap();
+    assert!(auth.starts_with("Bearer "));
+    let token = auth.trim_start_matches("Bearer ");
+    let decoded = general_purpose::STANDARD.decode(token).unwrap();
+    let decoded = String::from_utf8(decoded).unwrap();
+    log::debug!("decoded = {}", decoded);
+    assert!(decoded.starts_with("app_id,"));
+
+    Ok(())
+}

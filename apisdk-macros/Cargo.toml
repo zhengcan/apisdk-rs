@@ -1,0 +1,20 @@
+[package]
+name = "apisdk-macros"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+keywords.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+doc = false
+doctest = false
+
+[dependencies]
+proc-macro2 = "1.0"
+syn = { version = "2.0", features = ["full", "fold"] }
+quote = "1.0"
