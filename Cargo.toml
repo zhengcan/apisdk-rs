@@ -9,3 +9,8 @@ license = "MIT"
 description = "A highlevel API client framework for Rust."
 repository = "https://github.com/zhengcan/apisdk-rs"
 keywords = ["http", "restful", "reqwest", "api"]
+
+[patch.crates-io]
+apisdk = { path = "apisdk" }
+apisdk-macros = { path = "apisdk-macros" }
+
