@@ -1,6 +1,8 @@
 mod multi;
 mod single;
 
+use std::str::FromStr;
+
 use multi::*;
 use single::*;
 
@@ -29,7 +31,7 @@ use crate::{async_trait, RouteError, Url};
 /// }
 /// ```
 #[async_trait]
-pub trait ApiRouter: 'static + Sync + std::fmt::Debug {
+pub trait ApiRouter: 'static + Sync + Send + std::fmt::Debug {
     /// Indicate whether the HOST header should be rewritten.
     /// As default, we keep the original HOST from original url.
     fn rewrite_host(&self) -> bool {
@@ -128,6 +130,26 @@ where
 {
     fn from((host, port): (T, u16)) -> Self {
         Self::new_default(host, port)
+    }
+}
+
+impl FromStr for DefaultApiEndpoint {
+    type Err = RouteError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((host, port)) = s.split_once(':') {
+            if host.is_empty() {
+                return Err(RouteError::Custom("Invalid host".to_string()));
+            }
+            let port = match port.parse::<u16>() {
+                Ok(port) => port,
+                Err(e) => {
+                    return Err(RouteError::Custom(format!("Invalid port: {}", e)));
+                }
+            };
+            return Ok(DefaultApiEndpoint::new_default(host, port));
+        }
+        Err(RouteError::Custom(format!("Invalid endpoint: {}", s)))
     }
 }
 

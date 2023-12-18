@@ -11,7 +11,6 @@ pub fn md5(input: impl AsRef<[u8]>) -> String {
 }
 
 /// Calc md5 digest
-#[allow(unused)]
 pub fn md5_vec(input: &[impl AsRef<[u8]>]) -> String {
     let mut md5 = Md5::new();
     for p in input {
@@ -28,7 +27,6 @@ pub fn sha1(input: impl AsRef<[u8]>) -> String {
 }
 
 /// Calc sha1 digest
-#[allow(unused)]
 pub fn sha1_vec(input: &[impl AsRef<[u8]>]) -> String {
     let mut sha1 = Sha1::new();
     for i in input {

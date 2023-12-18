@@ -3,8 +3,9 @@ use std::sync::Arc;
 use reqwest::header::HOST;
 
 use crate::{
-    ApiResult, ApiRouter, ApiSignature, Client, ClientBuilder, Initialiser, IntoUrl, Method,
-    Middleware, OriginalEndpoint, RequestBuilder, RequestTraceIdInjector, SignatureMiddleware, Url,
+    ApiError, ApiResult, ApiRouter, ApiSignature, Client, ClientBuilder, Initialiser, IntoUrl,
+    Method, Middleware, OriginalEndpoint, RequestBuilder, RequestTraceIdInjector,
+    SignatureMiddleware, Url,
 };
 
 /// This struct is used to build an instance of ApiCore
@@ -31,7 +32,7 @@ impl ApiBuilder {
 
         Ok(Self {
             client: ClientBuilder::default(),
-            base_url: base_url.into_url()?,
+            base_url: base_url.into_url().map_err(ApiError::InvalidUrl)?,
             router: None,
             signature: None,
             initialisers: vec![],

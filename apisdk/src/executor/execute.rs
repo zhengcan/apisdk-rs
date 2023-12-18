@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use reqwest::header::CONTENT_TYPE;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 
@@ -176,7 +177,7 @@ where
 {
     req = RequestTraceIdInjector::inject_to_builder(req);
 
-    let form = form.get_multipart().ok_or(ApiError::NotMultipartForm)?;
+    let form = form.get_multipart().ok_or(ApiError::MultipartForm)?;
     req = req.multipart(form);
 
     let config = config.build(&mut req);
@@ -198,7 +199,7 @@ where
 
     // Mock
     if let Some(mock) = extensions.get::<MockServer>().cloned() {
-        let req = req.build()?;
+        let req = req.build().map_err(ApiError::BuildRequest)?;
         if config.log_enabled {
             log::debug!(target: config.log_target, "#[{}] Response <= (MOCK)", config.request_id());
         }
@@ -207,7 +208,7 @@ where
                 if config.log_enabled {
                     log::debug!(target: config.log_target, "#[{}] Payload: {}", config.request_id(), serde_json::to_string(&json).unwrap_or_default());
                 }
-                return serde_json::from_value(json).map_err(|e| e.into());
+                return serde_json::from_value(json).map_err(ApiError::DecodeJson);
             }
             Err(e) => {
                 if config.log_enabled {
@@ -223,15 +224,19 @@ where
         log::debug!(target: config.log_target, "#[{}] Response <= {:?}", config.request_id(), res);
     }
 
-    let res = match res.error_for_status() {
-        Ok(res) => res,
-        Err(e) => {
-            let e = e.into();
-            if config.log_enabled {
-                log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
-            }
-            return Err(e);
+    let status = res.status();
+    let res = if status.is_client_error() || status.is_server_error() {
+        let e = if status.is_client_error() {
+            ApiError::HttpClientStatus(status.as_u16(), status.to_string())
+        } else {
+            ApiError::HttpServerStatus(status.as_u16(), status.to_string())
+        };
+        if config.log_enabled {
+            log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
         }
+        return Err(e);
+    } else {
+        res
     };
 
     // Extract HTTP headers from response
@@ -247,6 +252,16 @@ where
         None
     };
 
+    let content_type = res
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/json")
+        .to_lowercase();
+    if !content_type.starts_with("application/json") {
+        return Err(ApiError::UnsupportedContentType(content_type));
+    }
+
     // Parse payload as json
     let mut json = match res.json::<Value>().await {
         Ok(json) => {
@@ -256,7 +271,7 @@ where
             json
         }
         Err(e) => {
-            let e = e.into();
+            let e = ApiError::DecodeResponse(content_type, e.to_string());
             if config.log_enabled {
                 log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
             }
@@ -278,7 +293,7 @@ where
     match serde_json::from_value(json) {
         Ok(r) => Ok(r),
         Err(e) => {
-            let e = e.into();
+            let e = ApiError::DecodeJson(e);
             if config.log_enabled {
                 log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
             }

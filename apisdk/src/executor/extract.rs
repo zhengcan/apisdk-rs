@@ -73,7 +73,7 @@ impl JsonExtractor for Value {
     where
         T: DeserializeOwned,
     {
-        serde_json::from_value(value).map_err(|e| e.into())
+        serde_json::from_value(value).map_err(ApiError::DecodeJson)
     }
 }
 
@@ -180,8 +180,8 @@ impl JsonExtractor for CodeDataMessage {
         match value.get("code").and_then(|c| c.as_i64()) {
             // Extract `data` field when `code` is 0
             Some(0) => match value.get_mut("data") {
-                Some(data) => serde_json::from_value(data.take()).map_err(|e| e.into()),
-                None => serde_json::from_value(Value::Null).map_err(|e| e.into()),
+                Some(data) => serde_json::from_value(data.take()).map_err(ApiError::DecodeJson),
+                None => serde_json::from_value(Value::Null).map_err(ApiError::DecodeJson),
             },
             // Build error when `code` is not 0
             Some(code) => {

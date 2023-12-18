@@ -8,6 +8,7 @@ mod result;
 mod router;
 
 pub use core::*;
+pub use digest::*;
 pub use executor::*;
 pub use extension::*;
 pub use result::*;

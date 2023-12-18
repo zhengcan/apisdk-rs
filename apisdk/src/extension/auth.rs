@@ -227,6 +227,7 @@ impl From<&str> for HashAlgorithm {
         match s.to_lowercase().as_str() {
             "sha1" => Self::Sha1,
             "md5" => Self::Md5,
+            "sha256" => Self::Sha256,
             _ => Self::Sha1,
         }
     }
