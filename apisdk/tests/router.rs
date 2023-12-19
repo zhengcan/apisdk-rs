@@ -1,4 +1,9 @@
-use apisdk::{send, ApiEndpoint, ApiResult, ApiRouter, ApiRouters, CodeDataMessage, RouteError};
+use std::sync::atomic::AtomicBool;
+
+use apisdk::{
+    send, ApiEndpoint, ApiResult, ApiRouter, ApiRouters, CodeDataMessage, OriginalEndpoint,
+    RouteError,
+};
 use async_trait::async_trait;
 use common::Payload;
 
@@ -40,22 +45,39 @@ async fn test_route_error() -> ApiResult<()> {
     start_server().await;
 
     #[derive(Debug)]
-    struct MyRouter {}
+    struct MyRouter {
+        flag: AtomicBool,
+    }
 
     #[async_trait]
     impl ApiRouter for MyRouter {
         async fn next_endpoint(&self) -> Result<Box<dyn ApiEndpoint>, RouteError> {
-            Err(RouteError::ServiceDiscovery(anyhow::format_err!(
-                "Some error"
-            )))
+            let flag = self
+                .flag
+                .fetch_xor(true, std::sync::atomic::Ordering::AcqRel);
+            if flag {
+                Ok(Box::new(OriginalEndpoint::default()))
+            } else {
+                Err(RouteError::ServiceDiscovery(anyhow::format_err!(
+                    "Some error"
+                )))
+            }
         }
     }
 
-    let api = TheApi::builder().with_router(MyRouter {}).build();
+    let api = TheApi::builder()
+        .with_router(MyRouter {
+            flag: AtomicBool::new(false),
+        })
+        .build();
 
     let res = api.touch().await;
     log::debug!("res = {:?}", res);
     assert!(res.is_err());
+
+    let res = api.touch().await;
+    log::debug!("res = {:?}", res);
+    assert!(res.is_ok());
 
     Ok(())
 }

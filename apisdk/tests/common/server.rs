@@ -1,8 +1,8 @@
 use std::{collections::HashMap, time::Duration};
 
-use apisdk::header::HeaderMap;
+use apisdk::{header::HeaderMap, ApiError, ResponseBody};
 use futures::StreamExt;
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use tokio::sync::OnceCell;
 use warp::{
@@ -23,6 +23,17 @@ pub struct Payload<H = HashMap<String, String>> {
     pub form: HashMap<String, String>,
 }
 
+impl<H> TryFrom<ResponseBody> for Payload<H>
+where
+    H: DeserializeOwned,
+{
+    type Error = ApiError;
+
+    fn try_from(body: ResponseBody) -> Result<Self, Self::Error> {
+        body.parse_json()
+    }
+}
+
 static ONCE: OnceCell<()> = OnceCell::const_new();
 
 pub async fn start_server() {
@@ -31,8 +42,7 @@ pub async fn start_server() {
 
 async fn do_start_server() {
     tokio::spawn(async move {
-        let dump_normal = warp::any()
-            .and(warp::path!("v1" / "path" / "json"))
+        let dump_normal = warp::path!("v1" / "path" / "json")
             .and(warp::path::full())
             .and(warp::header::headers_cloned())
             .and(warp::query())
@@ -51,9 +61,7 @@ async fn do_start_server() {
             .and(warp::query())
             .and(warp::multipart::form())
             .and_then(handle_multipart);
-        let not_found = warp::any()
-            .and(warp::path!("v1" / "not-found"))
-            .and_then(handle_not_found);
+        let not_found = warp::path!("v1" / "not-found").and_then(handle_not_found);
 
         warp::serve(dump_normal.or(dump_form).or(dump_multipart).or(not_found))
             .run(([127, 0, 0, 1], PORT))
@@ -158,3 +166,9 @@ async fn handle_multipart(
 async fn handle_not_found() -> Result<String, warp::Rejection> {
     Err(warp::reject::not_found())
 }
+
+// #[tokio::test]
+// async fn standalone_server() {
+//     start_server().await;
+//     tokio::time::sleep(Duration::from_secs(60 * 5)).await
+// }

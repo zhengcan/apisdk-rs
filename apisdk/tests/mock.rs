@@ -1,4 +1,4 @@
-use apisdk::{send, ApiResult, CodeDataMessage, MockServer};
+use apisdk::{send, ApiError, ApiResult, CodeDataMessage, MockServer, ResponseBody};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -14,6 +14,14 @@ pub struct MockPayload {
     pub message: Option<String>,
 }
 
+impl TryFrom<ResponseBody> for MockPayload {
+    type Error = ApiError;
+
+    fn try_from(body: ResponseBody) -> Result<Self, Self::Error> {
+        body.parse_json()
+    }
+}
+
 impl TheApi {
     async fn touch(&self) -> ApiResult<MockPayload> {
         let req = self.get("/path/json").await?;
@@ -23,12 +31,12 @@ impl TheApi {
     async fn touch_mock(&self) -> ApiResult<MockPayload> {
         let req = self.get("/path/json").await?;
         let req = req.with_extension(MockServer::new(|_| {
-            Ok(json!({
+            Ok(ResponseBody::Json(json!({
                 "code": 0,
                 "data": {
                     "mock": true
                 }
-            }))
+            })))
         }));
         send!(req, CodeDataMessage).await
     }
@@ -55,12 +63,12 @@ async fn test_mock_all() -> ApiResult<()> {
 
     let api = TheApi::builder()
         .with_initialiser(MockServer::new(|_| {
-            Ok(json!({
+            Ok(ResponseBody::Json(json!({
                 "code": 0,
                 "data": {
                     "mock": true
                 }
-            }))
+            })))
         }))
         .build();
 

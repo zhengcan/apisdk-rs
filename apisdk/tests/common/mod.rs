@@ -7,6 +7,7 @@ use tracing_subscriber::{
 };
 
 mod api;
+#[allow(unused)]
 mod server;
 
 pub use api::*;

@@ -1,6 +1,6 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{Attribute, Visibility};
+use syn::{Attribute, GenericParam, Generics, Visibility};
 
 use crate::parse::{parse_meta, ApiMeta};
 
@@ -186,3 +186,53 @@ pub(crate) fn build_macro_overrides(_fn_name: Ident) -> Vec<TokenStream> {
         })
         .collect()
 }
+
+// pub(crate) fn build_simple_json_payload(name: Ident) -> TokenStream {
+//     quote! {
+//         impl apisdk::TryFromJson for #name {
+//             fn try_from_json(json: apisdk::serde_json::Value) -> apisdk::ApiResult<Self> {
+//                 apisdk::serde_json::from_value(json).map_err(|e| apisdk::ApiError::Other)
+//             }
+//         }
+//         impl apisdk::TryFromString for #name {
+//             fn try_from_string(text: String) -> apisdk::ApiResult<Self> {
+//                 Err(apisdk::ApiError::Other)
+//             }
+//         }
+//     }
+// }
+
+// pub(crate) fn build_generic_json_payload(name: Ident, generics: Generics) -> TokenStream {
+//     let idents: Vec<_> = generics
+//         .params
+//         .iter()
+//         .map(|p| match p {
+//             GenericParam::Lifetime(param) => {
+//                 let ident = param.lifetime.ident.clone();
+//                 quote! { #ident }
+//             }
+//             GenericParam::Type(param) => {
+//                 let ident = param.ident.clone();
+//                 quote! { #ident }
+//             }
+//             GenericParam::Const(param) => {
+//                 let ident = param.ident.clone();
+//                 quote! { #ident }
+//             }
+//         })
+//         .collect();
+//     println!("idents = {:?}", idents);
+
+//     quote! {
+//         impl<#(#idents)*> apisdk::TryFromJson for #name<#(#idents)*> {
+//             fn try_from_json(json: apisdk::serde_json::Value) -> apisdk::ApiResult<Self> {
+//                 apisdk::serde_json::from_value(json).map_err(|e| apisdk::ApiError::Other)
+//             }
+//         }
+//         impl<#(#idents)*> apisdk::TryFromString for #name<#(#idents)*> {
+//             fn try_from_string(text: String) -> apisdk::ApiResult<Self> {
+//                 Err(apisdk::ApiError::Other)
+//             }
+//         }
+//     }
+// }

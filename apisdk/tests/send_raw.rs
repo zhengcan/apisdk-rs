@@ -11,7 +11,7 @@ impl TheApi {
         send_raw!(req).await
     }
 
-    async fn touch_404(&self) -> ApiResult<Response> {
+    async fn touch_405(&self) -> ApiResult<Response> {
         let req = self.get("/not-found").await?;
         send_raw!(req).await
     }
@@ -32,15 +32,15 @@ async fn test_send_raw_200() -> ApiResult<()> {
 }
 
 #[tokio::test]
-async fn test_send_raw_404() -> ApiResult<()> {
+async fn test_send_raw_405() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
     let api = TheApi::builder().build();
 
-    let res = api.touch_404().await?;
+    let res = api.touch_405().await?;
     log::debug!("res = {:?}", res);
-    assert_eq!(404, res.status().as_u16());
+    assert_eq!(405, res.status().as_u16());
 
     Ok(())
 }

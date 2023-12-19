@@ -3,24 +3,25 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use reqwest::Request;
 use reqwest_middleware::{RequestBuilder, RequestInitialiser};
-use serde_json::Value;
 
-/// Reply json value to request. It should be used with MockServer.
+use crate::ResponseBody;
+
+/// Reply a response to request. It should be used with MockServer.
 #[async_trait]
-pub trait JsonResponder: 'static + Send + Sync {
+pub trait Responder: 'static + Send + Sync {
     /// Handle the request
     /// - req: HTTP request
-    async fn handle(&self, req: Request) -> anyhow::Result<Value>;
+    async fn handle(&self, req: Request) -> anyhow::Result<ResponseBody>;
 }
 
-/// Implement JsonResponder for function / closure
+/// Implement Responder for function / closure
 #[async_trait]
-impl<F> JsonResponder for F
+impl<F> Responder for F
 where
     F: 'static + Send + Sync,
-    F: Fn(Request) -> anyhow::Result<Value>,
+    F: Fn(Request) -> anyhow::Result<ResponseBody>,
 {
-    async fn handle(&self, req: Request) -> anyhow::Result<Value> {
+    async fn handle(&self, req: Request) -> anyhow::Result<ResponseBody> {
         self(req)
     }
 }
@@ -55,12 +56,12 @@ where
 #[derive(Clone)]
 pub struct MockServer {
     /// Internal responder
-    inner: Arc<dyn JsonResponder>,
+    inner: Arc<dyn Responder>,
 }
 
 impl MockServer {
     /// Create a new instance
-    pub fn new(reply: impl JsonResponder) -> Self {
+    pub fn new(reply: impl Responder) -> Self {
         Self {
             inner: Arc::new(reply),
         }
@@ -68,8 +69,8 @@ impl MockServer {
 }
 
 #[async_trait]
-impl JsonResponder for MockServer {
-    async fn handle(&self, req: Request) -> anyhow::Result<Value> {
+impl Responder for MockServer {
+    async fn handle(&self, req: Request) -> anyhow::Result<ResponseBody> {
         // Delegate to internal responder
         self.inner.handle(req).await
     }

@@ -61,10 +61,10 @@ dependencies = [
 
 [[package]]
 name = "apisdk"
-version = "0.0.3"
+version = "0.0.4-beta.1"
 dependencies = [
  "anyhow",
- "apisdk-macros 0.0.2",
+ "apisdk-macros 0.0.4-beta.1",
  "async-trait",
  "base64",
  "futures",
@@ -108,18 +108,7 @@ dependencies = [
 
 [[package]]
 name = "apisdk-macros"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f6df0afa6d665c96ff5cd0ca55d74f6123be0a5f6eddd09f8117ba3460a8327"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "apisdk-macros"
-version = "0.0.3"
+version = "0.0.4-beta.1"
 dependencies = [
  "proc-macro2",
  "quote",

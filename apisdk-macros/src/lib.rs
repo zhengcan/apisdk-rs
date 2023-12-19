@@ -111,3 +111,20 @@ pub fn api_method(
 
     output.into()
 }
+
+// #[proc_macro_derive(JsonPayload)]
+// pub fn json_payload(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+//     let input = parse_macro_input!(input as DeriveInput);
+//     let name = input.ident;
+//     let generics = input.generics;
+
+//     let output = if generics.params.is_empty() {
+//         build_simple_json_payload(name)
+//     } else {
+//         // build_simple_json_payload(name)
+//         build_generic_json_payload(name, generics)
+//     };
+
+//     println!("out = {:?}", output);
+//     output.into()
+// }

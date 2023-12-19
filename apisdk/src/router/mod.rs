@@ -100,6 +100,7 @@ pub trait ApiEndpoint {
 }
 
 /// This endpoint keep original base url from ApiCore
+#[derive(Debug, Default)]
 pub struct OriginalEndpoint;
 
 impl ApiEndpoint for OriginalEndpoint {

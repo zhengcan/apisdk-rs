@@ -54,21 +54,26 @@ pub enum ApiError {
     /// HTTP Server status error
     #[error("HTTP Server status error: [{0}] {1}")]
     HttpServerStatus(u16, String),
-    /// Unsupported Content-Type
-    #[error("Unsupported Content-Type: {0}")]
-    UnsupportedContentType(String),
+    /// Illegal Content-Type
+    /// - 0: value of content-type
+    #[error("Illegal Content-Type: {0}")]
+    IllegalContentType(String),
     /// Decode response error
+    /// - 0: value of content-type
+    /// - 1: message
     #[error("Decode response error: {0} => {1}")]
     DecodeResponse(String, String),
     /// Decode json error
     #[error("Decode json error: {0}")]
     DecodeJson(#[from] serde_json::Error),
-    /// Invalid json
-    #[error("Invalid json: {0}")]
-    InvalidJson(Value),
+    /// Illegal json
+    #[error("Illegal json: {0}")]
+    IllegalJson(Value),
     /// Business error
     #[error("Business error: {0} - {1:?}")]
     BusinessError(i64, Option<String>),
+    #[error("Other error")]
+    Other,
 }
 
 impl ApiError {

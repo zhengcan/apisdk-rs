@@ -13,42 +13,42 @@ macro_rules! _function_path {
     }};
 }
 
-/// Internal macro
-#[macro_export]
-#[doc(hidden)]
-macro_rules! _is_trait {
-    ($type:ty, $trait:path) => {{
-        trait A {
-            fn is(&self) -> bool;
-        }
+// /// Internal macro
+// #[macro_export]
+// #[doc(hidden)]
+// macro_rules! _is_trait {
+//     ($type:ty, $trait:path) => {{
+//         trait A {
+//             fn is(&self) -> bool;
+//         }
 
-        struct B<T: ?Sized>(core::marker::PhantomData<T>);
+//         struct B<T: ?Sized>(core::marker::PhantomData<T>);
 
-        impl<T: ?Sized> core::ops::Deref for B<T> {
-            type Target = ();
-            fn deref(&self) -> &Self::Target {
-                &()
-            }
-        }
+//         impl<T: ?Sized> core::ops::Deref for B<T> {
+//             type Target = ();
+//             fn deref(&self) -> &Self::Target {
+//                 &()
+//             }
+//         }
 
-        impl<T: ?Sized> A for B<T>
-        where
-            T: $trait,
-        {
-            fn is(&self) -> bool {
-                true
-            }
-        }
+//         impl<T: ?Sized> A for B<T>
+//         where
+//             T: $trait,
+//         {
+//             fn is(&self) -> bool {
+//                 true
+//             }
+//         }
 
-        impl A for () {
-            fn is(&self) -> bool {
-                false
-            }
-        }
+//         impl A for () {
+//             fn is(&self) -> bool {
+//                 false
+//             }
+//         }
 
-        B::<$type>(core::marker::PhantomData).is()
-    }};
-}
+//         B::<$type>(core::marker::PhantomData).is()
+//     }};
+// }
 
 /// Send request
 ///
@@ -69,20 +69,23 @@ macro_rules! _is_trait {
 /// ### Option 2: Use a `Extractor` to get some fields from response
 ///
 /// ```
-/// use apisdk::{ApiError, ApiResult, Extractor};
+/// use apisdk::{ApiError, ApiResult, Content, Extractor};
 /// use serde::{Deserialize, DeserializeOwned};
-/// use serde_json::Value;
 ///
 /// struct MyExtractor {}
 /// impl Extractor for MyExtractor {
-///     fn try_extract<T>(value: Value) -> ApiResult<T>
+///     fn try_extract<T>(content: Content) -> ApiResult<T>
 ///     where
 ///         T: DeserializeOwned,
 ///     {
-///         let mut value = value;
-///         match value.get("data") {
-///             Some(data) => serde_json::from_value(data.take()).map_err(|e| e.into()),
-///             None => Err(ApiError::InvalidJson(value)),
+///         match content {
+///             Content::Json(mut value) => {
+///                 match value.get("data") {
+///                     Some(data) => serde_json::from_value(data.take()).map_err(|e| e.into()),
+///                     None => Err(ApiError::InvalidJson(value)),
+///                 }
+///             }
+///             Content::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text)),
 ///         }
 ///     }
 /// }
@@ -107,14 +110,18 @@ macro_rules! _is_trait {
 #[macro_export]
 macro_rules! send {
     ($req:expr) => {
-        $crate::internal::_send(
-            $req,
-            $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
-        )
+        async {
+            $crate::internal::_send(
+                $req,
+                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
+            )
+            .await
+            .and_then(|c| c.try_into())
+        }
     };
     ($req:expr, ()) => {
         async {
-            let _: $crate::Content = $crate::internal::_send(
+            let _ = $crate::internal::_send(
                 $req,
                 $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
             )
@@ -125,7 +132,7 @@ macro_rules! send {
     ($req:expr, $extractor:ty) => {
         async {
             use $crate::Extractor;
-            let result: $crate::Content = $crate::internal::_send(
+            let result = $crate::internal::_send(
                 $req,
                 $crate::internal::RequestConfigurator::new(
                     $crate::_function_path!(),
@@ -148,16 +155,15 @@ macro_rules! _send_with {
     };
     ($req:expr, (), $config:expr) => {
         async {
-            let _: $crate::Content =
-                $crate::internal::_send($req, $config.merge($crate::_function_path!(), false))
-                    .await?;
+            let _ = $crate::internal::_send($req, $config.merge($crate::_function_path!(), false))
+                .await?;
             Ok(())
         }
     };
     ($req:expr, $extractor:ty, $config:expr) => {
         async {
             use $crate::Extractor;
-            let result: $crate::Content = $crate::internal::_send(
+            let result = $crate::internal::_send(
                 $req,
                 $config.merge($crate::_function_path!(), <$extractor>::require_headers()),
             )
@@ -183,15 +189,19 @@ macro_rules! _send_with {
 #[macro_export]
 macro_rules! send_json {
     ($req:expr, $json:expr) => {
-        $crate::internal::_send_json(
-            $req,
-            &($json),
-            $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
-        )
+        async {
+            $crate::internal::_send_json(
+                $req,
+                &($json),
+                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
+            )
+            .await
+            .and_then(|c| c.try_into())
+        }
     };
     ($req:expr, $json:expr, ()) => {
         async {
-            let _: $crate::Content = $crate::internal::_send_json(
+            let _ = $crate::internal::_send_json(
                 $req,
                 &($json),
                 $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
@@ -203,7 +213,7 @@ macro_rules! send_json {
     ($req:expr, $json:expr, $extractor:ty) => {
         async {
             use $crate::Extractor;
-            let result: $crate::Content = $crate::internal::_send_json(
+            let result = $crate::internal::_send_json(
                 $req,
                 &($json),
                 $crate::internal::RequestConfigurator::new(
@@ -231,7 +241,7 @@ macro_rules! _send_json_with {
     };
     ($req:expr, $json:expr, (), $config:expr) => {
         async {
-            let _: $crate::Content = $crate::internal::_send_json(
+            let _ = $crate::internal::_send_json(
                 $req,
                 &($json),
                 $config.merge($crate::_function_path!(), false),
@@ -243,7 +253,7 @@ macro_rules! _send_json_with {
     ($req:expr, $json:expr, $extractor:ty, $config:expr) => {
         async {
             use $crate::Extractor;
-            let result: $crate::Content = $crate::internal::_send_json(
+            let result = $crate::internal::_send_json(
                 $req,
                 &($json),
                 $config.merge($crate::_function_path!(), <$extractor>::require_headers()),
@@ -283,15 +293,19 @@ macro_rules! _send_json_with {
 #[macro_export]
 macro_rules! send_form {
     ($req:expr, $form:expr) => {
-        $crate::internal::_send_form(
-            $req,
-            $form,
-            $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
-        )
+        async {
+            $crate::internal::_send_form(
+                $req,
+                $form,
+                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
+            )
+            .await
+            .and_then(|c| c.try_into())
+        }
     };
     ($req:expr, $form:expr, ()) => {
         async {
-            let _: $crate::Content = $crate::internal::_send_form(
+            let _ = $crate::internal::_send_form(
                 $req,
                 $form,
                 $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
@@ -303,7 +317,7 @@ macro_rules! send_form {
     ($req:expr, $form:expr, $extractor:ty) => {
         async {
             use $crate::Extractor;
-            let result: $crate::Content = $crate::internal::_send_form(
+            let result = $crate::internal::_send_form(
                 $req,
                 $form,
                 $crate::internal::RequestConfigurator::new(
@@ -323,11 +337,19 @@ macro_rules! send_form {
 #[doc(hidden)]
 macro_rules! _send_form_with {
     ($req:expr, $form:expr, $config:expr) => {
-        $crate::internal::_send_form($req, $form, $config.merge($crate::_function_path!(), true))
+        async {
+            $crate::internal::_send_form(
+                $req,
+                $form,
+                $config.merge($crate::_function_path!(), true),
+            )
+            .await
+            .and_then(|c| c.try_into())
+        }
     };
     ($req:expr, $form:expr, (), $config:expr) => {
         async {
-            let _: $crate::Content = $crate::internal::_send_form(
+            let _ = $crate::internal::_send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -339,7 +361,7 @@ macro_rules! _send_form_with {
     ($req:expr, $form:expr, $extractor:ty, $config:expr) => {
         async {
             use $crate::Extractor;
-            let result: $crate::Content = $crate::internal::_send_form(
+            let result = $crate::internal::_send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), <$extractor>::require_headers()),
@@ -368,15 +390,19 @@ macro_rules! _send_form_with {
 #[macro_export]
 macro_rules! send_multipart {
     ($req:expr, $form:expr) => {
-        $crate::internal::_send_multipart(
-            $req,
-            $form,
-            $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
-        )
+        async {
+            $crate::internal::_send_multipart(
+                $req,
+                $form,
+                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
+            )
+            .await
+            .and_then(|c| c.try_into())
+        }
     };
     ($req:expr, $form:expr, ()) => {
         async {
-            let _: $crate::Content = $crate::internal::_send_multipart(
+            let _ = $crate::internal::_send_multipart(
                 $req,
                 $form,
                 $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
@@ -388,7 +414,7 @@ macro_rules! send_multipart {
     ($req:expr, $form:expr, $extractor:ty) => {
         async {
             use $crate::Extractor;
-            let result: $crate::Content = $crate::internal::_send_multipart(
+            let result = $crate::internal::_send_multipart(
                 $req,
                 $form,
                 $crate::internal::RequestConfigurator::new(
@@ -408,15 +434,19 @@ macro_rules! send_multipart {
 #[doc(hidden)]
 macro_rules! _send_multipart_with {
     ($req:expr, $form:expr, $config:expr) => {
-        $crate::internal::_send_multipart(
-            $req,
-            $form,
-            $config.merge($crate::_function_path!(), true),
-        )
+        async {
+            $crate::internal::_send_multipart(
+                $req,
+                $form,
+                $config.merge($crate::_function_path!(), true),
+            )
+            .await
+            .and_then(|c| c.try_into())
+        }
     };
     ($req:expr, $form:expr, (), $config:expr) => {
         async {
-            let _: $crate::Content = $crate::internal::_send_multipart(
+            let _ = $crate::internal::_send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -428,7 +458,7 @@ macro_rules! _send_multipart_with {
     ($req:expr, $form:expr, $extractor:ty, $config:expr) => {
         async {
             use $crate::Extractor;
-            let result: $crate::Content = $crate::internal::_send_multipart(
+            let result = $crate::internal::_send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), <$extractor>::require_headers()),

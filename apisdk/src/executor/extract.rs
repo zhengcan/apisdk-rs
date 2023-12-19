@@ -5,10 +5,26 @@ use serde_json::Value;
 
 use crate::{ApiError, ApiResult};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Content {
+/// This enum represents the payload of respones
+#[derive(Debug)]
+pub enum ResponseBody {
+    /// Json (content-type = application/json)
     Json(Value),
+    /// Text (content-type = text/*)
     Text(String),
+}
+
+impl ResponseBody {
+    /// Parse json to target type
+    pub fn parse_json<T>(self) -> ApiResult<T>
+    where
+        T: DeserializeOwned,
+    {
+        match self {
+            Self::Json(json) => serde_json::from_value(json).map_err(ApiError::DecodeJson),
+            _ => Err(ApiError::Other),
+        }
+    }
 }
 
 /// This trait is used to extract result from response.
@@ -28,16 +44,16 @@ pub enum Content {
 /// pub struct CheckReturnCode;
 ///
 /// impl Extractor for CheckReturnCode {
-///     fn try_extract<T>(content: Content) -> ApiResult<T> {
-///         match content {
-///             Content::Json(value) => {
+///     fn try_extract<T>(body: ResponseBody) -> ApiResult<T> {
+///         match body {
+///             ResponseBody::Json(value) => {
 ///                 match value.get("ret_code").and_then(|c| c.as_i64()) {
 ///                     Some(0) => serde_json::from_value(value).map_err(|e| e.into()),
 ///                     Some(c) => Err(ApiError::BusinessError(c, Some("Invalid ret_code"))),
 ///                     None => Err(ApiError::BusinessError(c, Some("No ret_code"))),
 ///                 }
 ///             }
-///             Content::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text))
+///             ResponseBody::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text))
 ///         }
 ///     }
 /// }
@@ -49,13 +65,13 @@ pub enum Content {
 /// pub struct ExtractData;
 ///
 /// impl Extractor for ExtractData {
-///     fn try_extract<T>(content: Content) -> ApiResult<T> {
-///         match content {
-///             Content::Json(value) => {
+///     fn try_extract<T>(body: ResponseBody) -> ApiResult<T> {
+///         match body {
+///             ResponseBody::Json(value) => {
 ///                 let data = value.get("data").unwrap_or(Value::Null);
 ///                 serde_json::from_value(data).map_err(|e| e.into())
 ///             }
-///             Content::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text))
+///             ResponseBody::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text))
 ///         }
 ///     }
 /// }
@@ -78,35 +94,49 @@ pub trait Extractor {
     /// Try to extract result from response.
     ///
     /// The HTTP headers will be inject as `__headers__` field if possible.
-    /// - content: the content of response
-    fn try_extract<T>(content: Content) -> ApiResult<T>
+    /// - body: the body of response
+    fn try_extract<T>(body: ResponseBody) -> ApiResult<T>
     where
-        T: DeserializeOwned;
+        T: TryFrom<ResponseBody>,
+        T::Error: Into<ApiError>;
+}
+
+impl TryFrom<ResponseBody> for Value {
+    type Error = ApiError;
+
+    fn try_from(body: ResponseBody) -> Result<Self, Self::Error> {
+        body.parse_json()
+    }
 }
 
 impl Extractor for Value {
-    fn try_extract<T>(content: Content) -> ApiResult<T>
+    fn try_extract<T>(body: ResponseBody) -> ApiResult<T>
     where
-        T: DeserializeOwned,
+        T: TryFrom<ResponseBody>,
+        T::Error: Into<ApiError>,
     {
-        match content {
-            Content::Json(value) => serde_json::from_value(value).map_err(ApiError::DecodeJson),
-            Content::Text(text) => serde_json::from_str(&text).map_err(ApiError::DecodeJson),
+        T::try_from(body).map_err(|e| e.into())
+    }
+}
+
+impl TryFrom<ResponseBody> for String {
+    type Error = ApiError;
+
+    fn try_from(body: ResponseBody) -> Result<Self, Self::Error> {
+        match body {
+            ResponseBody::Json(json) => Ok(json.to_string()),
+            ResponseBody::Text(text) => Ok(text),
         }
     }
 }
 
 impl Extractor for String {
-    fn try_extract<T>(content: Content) -> ApiResult<T>
+    fn try_extract<T>(body: ResponseBody) -> ApiResult<T>
     where
-        T: DeserializeOwned,
+        T: TryFrom<ResponseBody>,
+        T::Error: Into<ApiError>,
     {
-        match content {
-            Content::Json(value) => {
-                serde_json::from_str(&value.to_string()).map_err(ApiError::DecodeJson)
-            }
-            Content::Text(text) => serde_json::from_str(&text).map_err(ApiError::DecodeJson),
-        }
+        T::try_from(body).map_err(|e| e.into())
     }
 }
 
@@ -204,20 +234,29 @@ impl<T> CodeDataMessage<T> {
     }
 }
 
+impl TryFrom<ResponseBody> for CodeDataMessage {
+    type Error = ApiError;
+
+    fn try_from(body: ResponseBody) -> Result<Self, Self::Error> {
+        body.parse_json()
+    }
+}
+
 impl Extractor for CodeDataMessage {
-    fn try_extract<T>(content: Content) -> ApiResult<T>
+    fn try_extract<T>(body: ResponseBody) -> ApiResult<T>
     where
-        T: DeserializeOwned,
+        T: TryFrom<ResponseBody>,
+        T::Error: Into<ApiError>,
     {
-        match content {
-            Content::Json(mut value) => {
+        match body {
+            ResponseBody::Json(mut value) => {
                 match value.get("code").and_then(|c| c.as_i64()) {
                     // Extract `data` field when `code` is 0
                     Some(0) => match value.get_mut("data") {
                         Some(data) => {
-                            serde_json::from_value(data.take()).map_err(ApiError::DecodeJson)
+                            T::try_from(ResponseBody::Json(data.take())).map_err(|e| e.into())
                         }
-                        None => serde_json::from_value(Value::Null).map_err(ApiError::DecodeJson),
+                        None => T::try_from(ResponseBody::Json(Value::Null)).map_err(|e| e.into()),
                     },
                     // Build error when `code` is not 0
                     Some(code) => {
@@ -229,10 +268,10 @@ impl Extractor for CodeDataMessage {
                         Err(ApiError::BusinessError(code, message))
                     }
                     // Failed to parse without `code` field
-                    None => Err(ApiError::InvalidJson(value)),
+                    None => Err(ApiError::IllegalJson(value)),
                 }
             }
-            Content::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text)),
+            ResponseBody::Text(_text) => Err(ApiError::Other),
         }
     }
 }
