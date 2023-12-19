@@ -65,6 +65,24 @@ pub trait ApiSignature: TokenProvider + std::fmt::Debug {
     }
 }
 
+#[async_trait]
+impl TokenProvider for Box<dyn ApiSignature> {
+    async fn generate_token(&self) -> Result<String, reqwest_middleware::Error> {
+        self.as_ref().generate_token().await
+    }
+}
+
+#[async_trait]
+impl ApiSignature for Box<dyn ApiSignature> {
+    fn get_carrier(&self) -> &Carrier {
+        self.as_ref().get_carrier()
+    }
+
+    async fn sign(&self, req: Request) -> Result<Request, reqwest_middleware::Error> {
+        self.as_ref().sign(req).await
+    }
+}
+
 /// This trait is used to update signature
 pub trait SignatureTrait {
     /// Update signature to use `Header`

@@ -2,15 +2,6 @@
 members = ["apisdk", "apisdk-macros", "sdks/*"]
 resolver = "2"
 
-[workspace.package]
-version = "0.0.2"
-edition = "2021"
-license = "MIT"
-description = "A highlevel API client framework for Rust."
-repository = "https://github.com/zhengcan/apisdk-rs"
-keywords = ["http", "restful", "reqwest", "api"]
-
 [patch.crates-io]
 apisdk = { path = "apisdk" }
 apisdk-macros = { path = "apisdk-macros" }
-

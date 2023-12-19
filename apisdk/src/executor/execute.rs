@@ -42,26 +42,22 @@ impl RequestConfigurator {
     /// Build RequestConfig
     fn build(self, req: &mut RequestBuilder) -> RequestConfig {
         let extensions = req.extensions();
-        extensions
+
+        let request_id = extensions
+            .get::<RequestId>()
+            .map(|id| id.request_id.clone())
+            .unwrap_or_default();
+
+        let log_enabled = extensions
             .get::<LogConfig>()
-            .map(|log_config| {
-                let request_id = extensions
-                    .get::<RequestId>()
-                    .map(|id| id.request_id.clone())
-                    .unwrap_or_default();
-                RequestConfig {
-                    log_target: self.log_target,
-                    log_enabled: self.log_enabled.unwrap_or(log_config.enabled),
-                    require_headers: self.require_headers,
-                    request_id: Some(request_id),
-                }
-            })
-            .unwrap_or_else(|| RequestConfig {
-                log_target: self.log_target,
-                log_enabled: self.log_enabled.unwrap_or_default(),
-                require_headers: true,
-                request_id: None,
-            })
+            .map(|log_config| log_config.enabled)
+            .unwrap_or_default();
+        RequestConfig {
+            log_target: self.log_target,
+            log_enabled: self.log_enabled.unwrap_or(log_enabled),
+            require_headers: self.require_headers,
+            request_id,
+        }
     }
 }
 
@@ -75,12 +71,12 @@ struct RequestConfig {
     /// Indicate whether to parse headers from response or not
     require_headers: bool,
     /// The X-Request-ID value
-    request_id: Option<String>,
+    request_id: String,
 }
 
 impl RequestConfig {
     pub fn request_id(&self) -> &str {
-        self.request_id.as_deref().unwrap_or_default()
+        self.request_id.as_str()
     }
 }
 
@@ -91,11 +87,11 @@ pub async fn _send<O>(mut req: RequestBuilder, config: RequestConfigurator) -> A
 where
     O: DeserializeOwned,
 {
-    req = RequestTraceIdInjector::inject_to_builder(req);
+    req = RequestTraceIdInjector::inject_extension(req);
 
     let config = config.build(&mut req);
     if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] Request => {:?}", config.request_id(), req);
+        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
     }
 
     send(req, config).await
@@ -114,14 +110,14 @@ where
     I: Serialize + ?Sized,
     O: DeserializeOwned,
 {
-    req = RequestTraceIdInjector::inject_to_builder(req);
+    req = RequestTraceIdInjector::inject_extension(req);
 
     req = req.json(json);
 
     let config = config.build(&mut req);
     if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] Request => {:?}", config.request_id(), req);
-        log::debug!(target: config.log_target, "#[{}] Json: {}", config.request_id(), serde_json::to_string(json).unwrap_or_default());
+        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
+        log::debug!(target: config.log_target, "#[{}] Json {}", config.request_id(), serde_json::to_string(json).unwrap_or_default());
     }
 
     send(req, config).await
@@ -140,7 +136,7 @@ where
     I: FormLike,
     O: DeserializeOwned,
 {
-    req = RequestTraceIdInjector::inject_to_builder(req);
+    req = RequestTraceIdInjector::inject_extension(req);
 
     let is_multipart = form.is_multipart();
     let meta = form.get_meta();
@@ -155,8 +151,8 @@ where
 
     let config = config.build(&mut req);
     if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] Request => {:?}", config.request_id(), req);
-        log::debug!(target: config.log_target, "#[{}] {}: {:?}", config.request_id(), if is_multipart { "Multipart"} else {"Form"}, meta);
+        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
+        log::debug!(target: config.log_target, "#[{}] {} {:?}", config.request_id(), if is_multipart { "Multipart"} else {"Form"}, meta);
     }
 
     send(req, config).await
@@ -175,14 +171,14 @@ where
     I: FormLike,
     O: DeserializeOwned,
 {
-    req = RequestTraceIdInjector::inject_to_builder(req);
+    req = RequestTraceIdInjector::inject_extension(req);
 
     let form = form.get_multipart().ok_or(ApiError::MultipartForm)?;
     req = req.multipart(form);
 
     let config = config.build(&mut req);
     if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] Request => {:?}", config.request_id(), req);
+        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
     }
 
     send(req, config).await
@@ -201,12 +197,12 @@ where
     if let Some(mock) = extensions.get::<MockServer>().cloned() {
         let req = req.build().map_err(ApiError::BuildRequest)?;
         if config.log_enabled {
-            log::debug!(target: config.log_target, "#[{}] Response <= (MOCK)", config.request_id());
+            log::debug!(target: config.log_target, "#[{}] Response (MOCK)", config.request_id());
         }
         match mock.handle(req).await {
             Ok(json) => {
                 if config.log_enabled {
-                    log::debug!(target: config.log_target, "#[{}] Payload: {}", config.request_id(), serde_json::to_string(&json).unwrap_or_default());
+                    log::debug!(target: config.log_target, "#[{}] Payload {}", config.request_id(), serde_json::to_string(&json).unwrap_or_default());
                 }
                 return serde_json::from_value(json).map_err(ApiError::DecodeJson);
             }
@@ -221,7 +217,7 @@ where
 
     let res = req.send().await?;
     if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] Response <= {:?}", config.request_id(), res);
+        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), res);
     }
 
     let status = res.status();

@@ -42,6 +42,17 @@ pub trait ApiRouter: 'static + Sync + Send + std::fmt::Debug {
     async fn next_endpoint(&self) -> Result<Box<dyn ApiEndpoint>, RouteError>;
 }
 
+#[async_trait]
+impl ApiRouter for Box<dyn ApiRouter> {
+    fn rewrite_host(&self) -> bool {
+        self.as_ref().rewrite_host()
+    }
+
+    async fn next_endpoint(&self) -> Result<Box<dyn ApiEndpoint>, RouteError> {
+        self.as_ref().next_endpoint().await
+    }
+}
+
 /// This struct provides several built-in implements of `ApiRouter`
 pub struct ApiRouters;
 

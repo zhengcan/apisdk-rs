@@ -1,11 +1,11 @@
 [package]
 name = "apisdk"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-description.workspace = true
-repository.workspace = true
-keywords.workspace = true
+version = "0.0.3"
+edition = "2021"
+license = "MIT"
+description = "A highlevel API client framework for Rust."
+repository = "https://github.com/zhengcan/apisdk-rs"
+keywords = ["http", "restful", "reqwest", "api"]
 readme = "../README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

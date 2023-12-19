@@ -10,6 +10,9 @@ pub enum RouteError {
     /// Service discovery error
     #[error("Service discovery error: {0}")]
     ServiceDiscovery(anyhow::Error),
+    /// IO error
+    #[error("IO error: {0}")]
+    IoError(std::io::Error),
     /// Update scheme error
     #[error("Update scheme error: {0} => {1}")]
     UpdateScheme(Url, String),
@@ -66,6 +69,12 @@ pub enum ApiError {
     /// Business error
     #[error("Business error: {0} - {1:?}")]
     BusinessError(i64, Option<String>),
+}
+
+impl ApiError {
+    pub fn new(code: i64, message: impl ToString) -> Self {
+        Self::BusinessError(code, Some(message.to_string()))
+    }
 }
 
 impl From<reqwest::Error> for ApiError {

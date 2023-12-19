@@ -78,74 +78,48 @@ impl TraceId {
     }
 }
 
-struct DefaultId(String);
-
-impl Default for DefaultId {
-    fn default() -> Self {
-        Self(generate_id())
-    }
-}
-
 /// This struct is used to inject RequestId and/or TraceId to request
 #[derive(Default)]
 pub(crate) struct RequestTraceIdInjector;
 
 impl RequestTraceIdInjector {
     /// This function will be invoked at the very beginning of send()
-    pub(crate) fn inject_to_builder(req: RequestBuilder) -> RequestBuilder {
+    pub(crate) fn inject_extension(req: RequestBuilder) -> RequestBuilder {
         let mut req = req;
 
-        // X-Request-ID
-        let request_id = if let Some(request_id) = req
-            .extensions()
-            .get::<RequestId>()
-            .map(|id| id.request_id.clone())
-        {
-            req = req.header("X-Request-ID", &request_id);
-            Some(request_id)
-        } else {
-            None
-        };
-
-        // X-Trace-ID & X-Span-ID
-        let trace_id = if let Some((trace_id, span_id)) = req
-            .extensions()
-            .get::<TraceId>()
-            .map(|id| (id.trace_id.clone(), id.span_id.clone()))
-        {
-            req = req.header("X-Trace-ID", &trace_id);
-            if let Some(span_id) = span_id {
-                req = req.header("X-Span-ID", span_id);
-            }
-            Some(trace_id)
-        } else {
-            None
-        };
+        let (request_id, trace_id) = (
+            req.extensions()
+                .get::<RequestId>()
+                .map(|id| id.request_id.clone()),
+            req.extensions()
+                .get::<TraceId>()
+                .map(|id| (Some(id.trace_id.clone())))
+                .unwrap_or(None),
+        );
 
         match (request_id, trace_id) {
-            (Some(id), None) | (None, Some(id)) => req = req.with_extension(DefaultId(id)),
-            (None, None) => req = req.with_extension(DefaultId::default()),
-            _ => {}
-        };
-
-        req
+            (Some(id), None) => req.with_extension(TraceId::new(id, None::<&str>)),
+            (None, Some(id)) => req.with_extension(RequestId::new(id)),
+            (None, None) => {
+                let id = generate_id();
+                req.with_extension(RequestId::new(&id))
+                    .with_extension(TraceId::new(id, None::<&str>))
+            }
+            _ => req,
+        }
     }
 
     /// This function will be invoked at the end of send()
-    pub(crate) fn inject_to_request(req: Request, extensions: &Extensions) -> Request {
+    pub(crate) fn inject_header(req: Request, extensions: &Extensions) -> Request {
         let mut req = req;
         let headers = req.headers_mut();
-        let default_id = extensions
-            .get::<DefaultId>()
-            .map(|id| id.0.clone())
-            .unwrap_or_else(generate_id);
 
         // X-Request-ID
         if !headers.contains_key("X-Request-ID") {
             let request_id = extensions
                 .get::<RequestId>()
                 .map(|id| id.request_id.clone())
-                .unwrap_or_else(|| default_id.clone());
+                .unwrap_or_else(generate_id);
             headers.insert("X-Request-ID", HeaderValue::from_str(&request_id).unwrap());
         }
 
@@ -153,7 +127,7 @@ impl RequestTraceIdInjector {
         if !headers.contains_key("X-Trace-ID") {
             let (trace_id, span_id) = match extensions.get::<TraceId>() {
                 Some(id) => (id.trace_id.clone(), id.span_id.clone()),
-                None => (default_id, None),
+                None => (generate_id(), None),
             };
             headers.insert("X-Trace-ID", HeaderValue::from_str(&trace_id).unwrap());
             if let Some(span_id) = span_id {
@@ -185,7 +159,7 @@ impl Middleware for RequestTraceIdInjector {
         extensions: &mut Extensions,
         next: Next<'_>,
     ) -> Result<Response, reqwest_middleware::Error> {
-        let req = Self::inject_to_request(req, extensions);
+        let req = Self::inject_header(req, extensions);
         next.run(req, extensions).await
     }
 }

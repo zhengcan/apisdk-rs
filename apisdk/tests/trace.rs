@@ -48,7 +48,7 @@ async fn test_trace_default() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().build();
+    let api = TheApi::builder().with_log(true).build();
 
     let res = api.touch().await?;
     log::debug!("res = {:?}", res);
