@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use reqwest::header::CONTENT_TYPE;
+use reqwest::{header::CONTENT_TYPE, Response, ResponseBuilderExt};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 
@@ -94,7 +94,7 @@ where
         log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
     }
 
-    send(req, config).await
+    send_and_parse(req, config).await
 }
 
 /// Send request with JSON payload
@@ -120,7 +120,7 @@ where
         log::debug!(target: config.log_target, "#[{}] Json {}", config.request_id(), serde_json::to_string(json).unwrap_or_default());
     }
 
-    send(req, config).await
+    send_and_parse(req, config).await
 }
 
 /// Send request with form payload
@@ -155,7 +155,7 @@ where
         log::debug!(target: config.log_target, "#[{}] {} {:?}", config.request_id(), if is_multipart { "Multipart"} else {"Form"}, meta);
     }
 
-    send(req, config).await
+    send_and_parse(req, config).await
 }
 
 /// Send request with multipart/data payload
@@ -181,13 +181,73 @@ where
         log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
     }
 
-    send(req, config).await
+    send_and_parse(req, config).await
 }
 
-/// Send request and parse response
+/// Send request, and get raw response
+/// - req: used to build request
+/// - config: control the send process
+pub async fn _send_raw(
+    mut req: RequestBuilder,
+    config: RequestConfigurator,
+) -> ApiResult<Response> {
+    req = RequestTraceIdInjector::inject_extension(req);
+
+    let config = config.build(&mut req);
+    if config.log_enabled {
+        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
+    }
+
+    send_and_unparse(req, config).await
+}
+
+/// Send request, and return unparsed response
 /// - req: the request to send
 /// - config: control the send process
-async fn send<O>(mut req: RequestBuilder, config: RequestConfig) -> ApiResult<O>
+async fn send_and_unparse(mut req: RequestBuilder, config: RequestConfig) -> ApiResult<Response> {
+    let extensions = req.extensions();
+
+    // Mock
+    if let Some(mock) = extensions.get::<MockServer>().cloned() {
+        let req = req.build().map_err(ApiError::BuildRequest)?;
+        if config.log_enabled {
+            log::debug!(target: config.log_target, "#[{}] Response (MOCK)", config.request_id());
+        }
+        let url = req.url().clone();
+        match mock.handle(req).await {
+            Ok(json) => {
+                if config.log_enabled {
+                    log::debug!(target: config.log_target, "#[{}] Payload {}", config.request_id(), serde_json::to_string(&json).unwrap_or_default());
+                }
+                let res = hyper::Response::builder()
+                    .url(url)
+                    .body(json.to_string())
+                    .map_err(|_| {
+                        ApiError::Middleware(anyhow::format_err!("Failed to build response"))
+                    })?;
+                return Ok(Response::from(res));
+            }
+            Err(e) => {
+                if config.log_enabled {
+                    log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
+                }
+                return Err(ApiError::Middleware(e));
+            }
+        }
+    }
+
+    let res = req.send().await?;
+    if config.log_enabled {
+        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), res);
+    }
+
+    Ok(res)
+}
+
+/// Send request, and parse response as desired type
+/// - req: the request to send
+/// - config: control the send process
+async fn send_and_parse<O>(mut req: RequestBuilder, config: RequestConfig) -> ApiResult<O>
 where
     O: DeserializeOwned,
 {
@@ -276,7 +336,7 @@ where
     };
 
     // Inject headers as `__headers__` field into payload
-    // JsonExtractor could parse the `__headers__` field if required
+    // Extractor could parse the `__headers__` field if required
     if let Some(headers) = headers {
         if let Value::Object(m) = &mut json {
             if let Ok(headers) = serde_json::to_value(headers) {

@@ -15,4 +15,5 @@ pub mod internal {
     pub use super::execute::_send_form;
     pub use super::execute::_send_json;
     pub use super::execute::_send_multipart;
+    pub use super::execute::_send_raw;
 }

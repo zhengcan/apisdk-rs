@@ -1,7 +1,7 @@
 mod multi;
 mod single;
 
-use std::str::FromStr;
+use std::{any::type_name, str::FromStr};
 
 use multi::*;
 use single::*;
@@ -31,7 +31,12 @@ use crate::{async_trait, RouteError, Url};
 /// }
 /// ```
 #[async_trait]
-pub trait ApiRouter: 'static + Sync + Send + std::fmt::Debug {
+pub trait ApiRouter: 'static + Sync + Send {
+    /// Get type_name, used in Debug
+    fn type_name(&self) -> &str {
+        type_name::<Self>()
+    }
+
     /// Indicate whether the HOST header should be rewritten.
     /// As default, we keep the original HOST from original url.
     fn rewrite_host(&self) -> bool {

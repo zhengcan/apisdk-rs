@@ -1,9 +1,15 @@
 use std::collections::HashMap;
 
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{ApiError, ApiResult};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Content {
+    Json(Value),
+    Text(String),
+}
 
 /// This trait is used to extract result from response.
 ///
@@ -11,7 +17,7 @@ use crate::{ApiError, ApiResult};
 ///
 /// ```
 /// let req = client.get("/api/path").await?;
-/// let res = send!(req, TypeOfJsonExtractor).await?;
+/// let res = send!(req, TypeOfExtractor).await?;
 /// ```
 ///
 /// # Examples
@@ -21,12 +27,17 @@ use crate::{ApiError, ApiResult};
 /// ```
 /// pub struct CheckReturnCode;
 ///
-/// impl JsonExtractor for CheckReturnCode {
-///     fn try_extract<T>(value: Value) -> ApiResult<T> {
-///         match value.get("ret_code").and_then(|c| c.as_i64()) {
-///             Some(0) => serde_json::from_value(value).map_err(|e| e.into()),
-///             Some(c) => Err(ApiError::BusinessError(c, Some("Invalid ret_code"))),
-///             None => Err(ApiError::BusinessError(c, Some("No ret_code"))),
+/// impl Extractor for CheckReturnCode {
+///     fn try_extract<T>(content: Content) -> ApiResult<T> {
+///         match content {
+///             Content::Json(value) => {
+///                 match value.get("ret_code").and_then(|c| c.as_i64()) {
+///                     Some(0) => serde_json::from_value(value).map_err(|e| e.into()),
+///                     Some(c) => Err(ApiError::BusinessError(c, Some("Invalid ret_code"))),
+///                     None => Err(ApiError::BusinessError(c, Some("No ret_code"))),
+///                 }
+///             }
+///             Content::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text))
 ///         }
 ///     }
 /// }
@@ -37,10 +48,15 @@ use crate::{ApiError, ApiResult};
 /// ```
 /// pub struct ExtractData;
 ///
-/// impl JsonExtractor for ExtractData {
-///     fn try_extract<T>(value: Value) -> ApiResult<T> {
-///         let data = value.get("data").unwrap_or(Value::Null);
-///         serde_json::from_value(data).map_err(|e| e.into())
+/// impl Extractor for ExtractData {
+///     fn try_extract<T>(content: Content) -> ApiResult<T> {
+///         match content {
+///             Content::Json(value) => {
+///                 let data = value.get("data").unwrap_or(Value::Null);
+///                 serde_json::from_value(data).map_err(|e| e.into())
+///             }
+///             Content::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text))
+///         }
 ///     }
 /// }
 /// ```
@@ -48,12 +64,12 @@ use crate::{ApiError, ApiResult};
 /// # Built-in Extractors
 ///
 /// - serde_json::Value
-///     - treat whole payload as output
+///     - treat whole payload as json output
 /// - apisdk::WholePayload
 ///     - an alias of serde_json::Value
 /// - apisdk::CodeDataMessage
-///     - parse `{code, data, message}` payload, and return `data` field
-pub trait JsonExtractor {
+///     - parse `{code, data, message}` json payload, and return `data` field
+pub trait Extractor {
     /// The extractor needs response HTTP headers or not.
     fn require_headers() -> bool {
         false
@@ -62,18 +78,35 @@ pub trait JsonExtractor {
     /// Try to extract result from response.
     ///
     /// The HTTP headers will be inject as `__headers__` field if possible.
-    /// - value: the response payload
-    fn try_extract<T>(value: Value) -> ApiResult<T>
+    /// - content: the content of response
+    fn try_extract<T>(content: Content) -> ApiResult<T>
     where
         T: DeserializeOwned;
 }
 
-impl JsonExtractor for Value {
-    fn try_extract<T>(value: Value) -> ApiResult<T>
+impl Extractor for Value {
+    fn try_extract<T>(content: Content) -> ApiResult<T>
     where
         T: DeserializeOwned,
     {
-        serde_json::from_value(value).map_err(ApiError::DecodeJson)
+        match content {
+            Content::Json(value) => serde_json::from_value(value).map_err(ApiError::DecodeJson),
+            Content::Text(text) => serde_json::from_str(&text).map_err(ApiError::DecodeJson),
+        }
+    }
+}
+
+impl Extractor for String {
+    fn try_extract<T>(content: Content) -> ApiResult<T>
+    where
+        T: DeserializeOwned,
+    {
+        match content {
+            Content::Json(value) => {
+                serde_json::from_str(&value.to_string()).map_err(ApiError::DecodeJson)
+            }
+            Content::Text(text) => serde_json::from_str(&text).map_err(ApiError::DecodeJson),
+        }
     }
 }
 
@@ -82,13 +115,13 @@ pub type WholePayload = Value;
 
 /// This struct is used to parse `{code, data, message}` payload.
 ///
-/// When it's used as `JsonExtractor`, it will extract `data` from payload.
+/// When it's used as `Extractor`, it will extract `data` from payload.
 ///
 /// # Examples
 ///
-/// ### As JsonExtractor
+/// ### As Extractor
 ///
-/// To be used as `JsonExtractor`, `CodeDataMessage` will check `code` field of response payload, and ensure it must be `0`.
+/// To be used as `Extractor`, `CodeDataMessage` will check `code` field of response payload, and ensure it must be `0`.
 /// If not, it will generate an ApiError instance with `code` and `message`.
 ///
 /// ```
@@ -115,7 +148,7 @@ pub type WholePayload = Value;
 ///     }
 /// }
 /// ```
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CodeDataMessage<T = Option<Value>> {
     /// `code` field
     pub code: i64,
@@ -171,29 +204,35 @@ impl<T> CodeDataMessage<T> {
     }
 }
 
-impl JsonExtractor for CodeDataMessage {
-    fn try_extract<T>(value: Value) -> ApiResult<T>
+impl Extractor for CodeDataMessage {
+    fn try_extract<T>(content: Content) -> ApiResult<T>
     where
         T: DeserializeOwned,
     {
-        let mut value = value;
-        match value.get("code").and_then(|c| c.as_i64()) {
-            // Extract `data` field when `code` is 0
-            Some(0) => match value.get_mut("data") {
-                Some(data) => serde_json::from_value(data.take()).map_err(ApiError::DecodeJson),
-                None => serde_json::from_value(Value::Null).map_err(ApiError::DecodeJson),
-            },
-            // Build error when `code` is not 0
-            Some(code) => {
-                let message = value
-                    .get("message")
-                    .or_else(|| value.get("msg"))
-                    .and_then(|m| m.as_str())
-                    .map(|m| m.to_string());
-                Err(ApiError::BusinessError(code, message))
+        match content {
+            Content::Json(mut value) => {
+                match value.get("code").and_then(|c| c.as_i64()) {
+                    // Extract `data` field when `code` is 0
+                    Some(0) => match value.get_mut("data") {
+                        Some(data) => {
+                            serde_json::from_value(data.take()).map_err(ApiError::DecodeJson)
+                        }
+                        None => serde_json::from_value(Value::Null).map_err(ApiError::DecodeJson),
+                    },
+                    // Build error when `code` is not 0
+                    Some(code) => {
+                        let message = value
+                            .get("message")
+                            .or_else(|| value.get("msg"))
+                            .and_then(|m| m.as_str())
+                            .map(|m| m.to_string());
+                        Err(ApiError::BusinessError(code, message))
+                    }
+                    // Failed to parse without `code` field
+                    None => Err(ApiError::InvalidJson(value)),
+                }
             }
-            // Failed to parse without `code` field
-            None => Err(ApiError::InvalidJson(value)),
+            Content::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text)),
         }
     }
 }

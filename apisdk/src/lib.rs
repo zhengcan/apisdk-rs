@@ -21,6 +21,9 @@ pub use apisdk_macros::*;
 /// Re-export from async_trait::async_trait
 pub use async_trait::async_trait;
 
+/// Re-export from serde_json::Value
+pub use serde_json::Value as JsonValue;
+
 // Re-export reqwest types
 pub use reqwest::header;
 pub use reqwest::multipart;

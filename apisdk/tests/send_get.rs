@@ -16,9 +16,19 @@ impl TheApi {
         send!(req).await
     }
 
+    async fn get_as_unit(&self) -> ApiResult<()> {
+        let req = self.get("/path/json").await?;
+        send!(req, ()).await
+    }
+
     async fn get_and_extract_value(&self) -> ApiResult<Value> {
         let req = self.get("/path/json").await?;
         send!(req, Value).await
+    }
+
+    async fn get_and_extract_text(&self) -> ApiResult<String> {
+        let req = self.get("/path/json").await?;
+        send!(req, String).await
     }
 
     async fn get_and_extract_cdm(&self) -> ApiResult<Value> {
@@ -54,6 +64,19 @@ async fn test_send_get_as_cdm() -> ApiResult<()> {
 }
 
 #[tokio::test]
+async fn test_send_get_as_unit() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::builder().build();
+
+    let res = api.get_as_unit().await?;
+    log::debug!("res = {:?}", res);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_send_get_and_extract_value() -> ApiResult<()> {
     init_logger();
     start_server().await;
@@ -61,6 +84,19 @@ async fn test_send_get_and_extract_value() -> ApiResult<()> {
     let api = TheApi::builder().build();
 
     let res = api.get_and_extract_value().await?;
+    log::debug!("res = {:?}", res);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_send_get_and_extract_text() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::builder().build();
+
+    let res = api.get_and_extract_text().await?;
     log::debug!("res = {:?}", res);
 
     Ok(())

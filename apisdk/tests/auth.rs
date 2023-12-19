@@ -1,7 +1,10 @@
 use apisdk::{
-    send, AccessTokenSignature, ApiResult, CodeDataMessage, HashedTokenSignature, SignatureTrait,
+    send, AccessTokenSignature, ApiResult, ApiSignature, Carrier, CodeDataMessage,
+    HashedTokenSignature, SignatureTrait, TokenProvider,
 };
+use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine};
+use reqwest::{header::AUTHORIZATION, Request};
 
 use crate::common::{init_logger, start_server, Payload, TheApi};
 
@@ -42,7 +45,7 @@ async fn test_access_token_auth_dynamic() -> ApiResult<()> {
 
     let res = api.touch().await?;
     log::debug!("res = {:?}", res);
-    let auth = res.headers.get("authorization").unwrap();
+    let auth = res.headers.get(AUTHORIZATION.as_str()).unwrap();
     assert_eq!("Bearer dynamic", auth);
 
     Ok(())
@@ -61,6 +64,39 @@ async fn test_access_token_auth_in_header() -> ApiResult<()> {
     log::debug!("res = {:?}", res);
     let auth = res.headers.get("x-auth").unwrap();
     assert_eq!("fixed", auth);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_access_token_auth_schemeless() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    struct Schemeless {}
+
+    #[async_trait]
+    impl TokenProvider for Schemeless {
+        async fn generate_token(
+            &self,
+            _req: &Request,
+        ) -> Result<String, reqwest_middleware::Error> {
+            Ok("token".to_string())
+        }
+    }
+    #[async_trait]
+    impl ApiSignature for Schemeless {
+        fn get_carrier(&self) -> &Carrier {
+            &Carrier::SchemelessAuth
+        }
+    }
+
+    let api = TheApi::builder().with_signature(Schemeless {}).build();
+
+    let res = api.touch().await?;
+    log::debug!("res = {:?}", res);
+    let auth = res.headers.get(AUTHORIZATION.as_str()).unwrap();
+    assert_eq!("token", auth);
 
     Ok(())
 }

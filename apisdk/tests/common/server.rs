@@ -51,8 +51,11 @@ async fn do_start_server() {
             .and(warp::query())
             .and(warp::multipart::form())
             .and_then(handle_multipart);
+        let not_found = warp::any()
+            .and(warp::path!("v1" / "not-found"))
+            .and_then(handle_not_found);
 
-        warp::serve(dump_normal.or(dump_form).or(dump_multipart))
+        warp::serve(dump_normal.or(dump_form).or(dump_multipart).or(not_found))
             .run(([127, 0, 0, 1], PORT))
             .await;
     });
@@ -150,4 +153,8 @@ async fn handle_multipart(
         "extra-field": "extra"
     });
     Ok(warp::reply::json(&resp))
+}
+
+async fn handle_not_found() -> Result<String, warp::Rejection> {
+    Err(warp::reject::not_found())
 }

@@ -103,7 +103,6 @@ impl ApiBuilder {
 }
 
 /// This struct is used to create HTTP request
-#[derive(Debug)]
 pub struct ApiCore {
     /// Reqwest Client
     client: Client,
@@ -113,6 +112,22 @@ pub struct ApiCore {
     router: Option<Arc<dyn ApiRouter>>,
     /// The holder of ApiSignature
     signature: Option<Arc<dyn ApiSignature>>,
+}
+
+impl std::fmt::Debug for ApiCore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("ApiCore");
+        let mut d = d
+            .field("client", &self.client)
+            .field("base_url", &self.base_url);
+        if let Some(r) = self.router.as_ref() {
+            d = d.field("router", &r.type_name());
+        }
+        if let Some(s) = self.signature.as_ref() {
+            d = d.field("signature", &s.type_name());
+        }
+        d.finish()
+    }
 }
 
 impl ApiCore {

@@ -16,10 +16,13 @@ doctest = false
 [dependencies]
 apisdk-macros = "0.0.2"
 async-trait = "0.1"
+# impls = "1.0"
+# downcast-rs = "1.2"
 http = "1.0"
 url = "2.5"
 reqwest = { version = "0.11", features = ["json", "multipart"] }
 reqwest-middleware = "0.2"
+hyper = "0.14"
 task-local-extensions = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
