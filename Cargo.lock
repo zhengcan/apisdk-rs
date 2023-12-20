@@ -34,37 +34,10 @@ checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
 
 [[package]]
 name = "apisdk"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7233825c77b5dae6891500672f0f22465f5a351898bbe3eae42705dc1642cc6c"
-dependencies = [
- "anyhow",
- "apisdk-macros 0.0.1",
- "async-trait",
- "base64",
- "hex",
- "http 1.0.0",
- "log",
- "md-5",
- "nanoid",
- "rand",
- "reqwest",
- "reqwest-middleware",
- "serde",
- "serde_json",
- "sha1",
- "sha2",
- "task-local-extensions",
- "thiserror",
- "url",
-]
-
-[[package]]
-name = "apisdk"
 version = "0.0.4-beta.2"
 dependencies = [
  "anyhow",
- "apisdk-macros 0.0.4-beta.2",
+ "apisdk-macros",
  "async-trait",
  "base64",
  "futures",
@@ -98,17 +71,6 @@ dependencies = [
 
 [[package]]
 name = "apisdk-macros"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b1c94b92bf2568505d2d679ea9390f7e01f2790c2369774be6ff3ef7c54f60b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "apisdk-macros"
 version = "0.0.4-beta.2"
 dependencies = [
  "proc-macro2",
@@ -120,7 +82,7 @@ dependencies = [
 name = "apisdk-typicode"
 version = "0.0.1"
 dependencies = [
- "apisdk 0.0.1",
+ "apisdk",
  "serde",
  "serde_json",
  "tokio",

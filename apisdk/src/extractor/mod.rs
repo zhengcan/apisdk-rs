@@ -99,3 +99,18 @@ impl ResponseBody {
         }
     }
 }
+
+/// This struct is used to parse response body to xml
+#[derive(Debug)]
+pub struct Body;
+
+impl Body {
+    /// Try to parse response
+    pub fn try_parse<T>(body: ResponseBody) -> ApiResult<T>
+    where
+        T: TryFrom<ResponseBody>,
+        T::Error: Into<ApiError>,
+    {
+        T::try_from(body).map_err(|e| e.into())
+    }
+}

@@ -9,7 +9,7 @@ publish = false
 doc = false
 
 [dependencies]
-apisdk = "0.0.1"
+apisdk = { path = "../../apisdk" }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0" }
 serde_json = { version = "1.0" }

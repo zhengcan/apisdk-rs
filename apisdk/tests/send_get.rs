@@ -6,19 +6,30 @@ use crate::common::{init_logger, start_server, TheApi};
 
 mod common;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 #[allow(unused)]
-struct MyCodeData {
+struct CustomCodeData {
     code: i64,
     data: Value,
 }
 
-impl TryFrom<ResponseBody> for MyCodeData {
+impl TryFrom<ResponseBody> for CustomCodeData {
     type Error = ApiError;
 
     fn try_from(body: ResponseBody) -> Result<Self, Self::Error> {
-        body.parse_json()
+        let scd: SimpleCodeData = body.parse_json()?;
+        Ok(Self {
+            code: scd.code,
+            data: scd.data,
+        })
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+struct SimpleCodeData {
+    code: i64,
+    data: Value,
 }
 
 impl TheApi {
@@ -32,14 +43,19 @@ impl TheApi {
         send!(req).await
     }
 
+    async fn get_as_ccd(&self) -> ApiResult<CustomCodeData> {
+        let req = self.get("/path/json").await?;
+        send!(req, Body).await
+    }
+
+    async fn get_as_scd(&self) -> ApiResult<SimpleCodeData> {
+        let req = self.get("/path/json").await?;
+        send!(req).await
+    }
+
     async fn get_as_unit(&self) -> ApiResult<()> {
         let req = self.get("/path/json").await?;
         send!(req, ()).await
-    }
-
-    async fn get_as_mcd(&self) -> ApiResult<MyCodeData> {
-        let req = self.get("/path/json").await?;
-        send!(req).await
     }
 
     async fn get_and_extract_value(&self) -> ApiResult<Value> {
@@ -85,6 +101,32 @@ async fn test_send_get_as_cdm() -> ApiResult<()> {
 }
 
 #[tokio::test]
+async fn test_send_get_as_ccd() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::builder().build();
+
+    let res = api.get_as_ccd().await?;
+    log::debug!("res = {:?}", res);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_send_get_as_scd() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::builder().build();
+
+    let res = api.get_as_scd().await?;
+    log::debug!("res = {:?}", res);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_send_get_as_unit() -> ApiResult<()> {
     init_logger();
     start_server().await;
@@ -92,19 +134,6 @@ async fn test_send_get_as_unit() -> ApiResult<()> {
     let api = TheApi::builder().build();
 
     let res = api.get_as_unit().await?;
-    log::debug!("res = {:?}", res);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_send_get_as_mcd() -> ApiResult<()> {
-    init_logger();
-    start_server().await;
-
-    let api = TheApi::builder().build();
-
-    let res = api.get_as_mcd().await?;
     log::debug!("res = {:?}", res);
 
     Ok(())
