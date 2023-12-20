@@ -5,7 +5,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::{
-    ApiError, ApiResult, FormLike, LogConfig, MockServer, RequestBuilder, RequestId,
+    ApiError, ApiResult, FormLike, LogConfig, MimeType, MockServer, RequestBuilder, RequestId,
     RequestTraceIdInjector, Responder, ResponseBody,
 };
 
@@ -213,24 +213,15 @@ async fn send_and_unparse(mut req: RequestBuilder, config: RequestConfig) -> Api
         let url = req.url().clone();
         match mock.handle(req).await {
             Ok(body) => {
-                if config.log_enabled {
-                    match &body {
-                        ResponseBody::Json(json) => {
-                            log::debug!(target: config.log_target, "#[{}] Payload {}", config.request_id(), serde_json::to_string(json).unwrap_or_default());
-                        }
-                        ResponseBody::Text(text) => {
-                            log::debug!(target: config.log_target, "#[{}] Payload(Text) {}", config.request_id(), text);
-                        }
-                    }
-                }
-
+                log_body(&body, &config);
                 let (content_type, text) = match body {
-                    ResponseBody::Json(json) => ("application/json", json.to_string()),
-                    ResponseBody::Text(text) => ("text/plain", text),
+                    ResponseBody::Json(json) => (MimeType::Json, json.to_string()),
+                    ResponseBody::Xml(xml) => (MimeType::Xml, xml),
+                    ResponseBody::Text(text) => (MimeType::Text, text),
                 };
                 let res = hyper::Response::builder()
                     .url(url)
-                    .header(CONTENT_TYPE, content_type)
+                    .header(CONTENT_TYPE, content_type.to_string())
                     .body(text)
                     .map_err(|_| {
                         ApiError::Middleware(anyhow::format_err!("Failed to build response"))
@@ -268,16 +259,7 @@ async fn send_and_parse(mut req: RequestBuilder, config: RequestConfig) -> ApiRe
         }
         match mock.handle(req).await {
             Ok(body) => {
-                if config.log_enabled {
-                    match &body {
-                        ResponseBody::Json(json) => {
-                            log::debug!(target: config.log_target, "#[{}] Payload {}", config.request_id(), serde_json::to_string(json).unwrap_or_default());
-                        }
-                        ResponseBody::Text(text) => {
-                            log::debug!(target: config.log_target, "#[{}] Payload(Text) {}", config.request_id(), text);
-                        }
-                    }
-                }
+                log_body(&body, &config);
                 return Ok(body);
             }
             Err(e) => {
@@ -316,20 +298,37 @@ async fn send_and_parse(mut req: RequestBuilder, config: RequestConfig) -> ApiRe
         .headers()
         .get(CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("text/plain")
-        .to_lowercase();
-    if content_type.starts_with("application/json") {
-        parse_as_json(res, content_type, config).await
-    } else if content_type.starts_with("text/") {
-        parse_as_text(res, content_type, config).await
-    } else {
-        return Err(ApiError::IllegalContentType(content_type));
+        .map(MimeType::from)
+        .unwrap_or(MimeType::Text);
+    match content_type {
+        MimeType::Json => parse_as_json(res, content_type, config).await,
+        MimeType::Xml => parse_as_xml(res, content_type, config).await,
+        MimeType::Text => parse_as_text(res, content_type, config).await,
+        _ => Err(ApiError::IllegalContentType(content_type)),
     }
 }
 
+/// Log response body
+fn log_body(body: &ResponseBody, config: &RequestConfig) {
+    if config.log_enabled {
+        match body {
+            ResponseBody::Json(json) => {
+                log::debug!(target: config.log_target, "#[{}] Body(Json) {}", config.request_id(), serde_json::to_string(json).unwrap_or_default());
+            }
+            ResponseBody::Xml(xml) => {
+                log::debug!(target: config.log_target, "#[{}] Body(Xml) {}", config.request_id(), xml);
+            }
+            ResponseBody::Text(text) => {
+                log::debug!(target: config.log_target, "#[{}] Body(Text) {}", config.request_id(), text);
+            }
+        }
+    }
+}
+
+/// Parse response body to json
 async fn parse_as_json(
     res: Response,
-    content_type: String,
+    content_type: MimeType,
     config: RequestConfig,
 ) -> ApiResult<ResponseBody> {
     // Extract HTTP headers from response
@@ -345,11 +344,11 @@ async fn parse_as_json(
         None
     };
 
-    // Parse payload as json
+    // Decode response
     let mut json = match res.json::<Value>().await {
         Ok(json) => {
             if config.log_enabled {
-                log::debug!(target: config.log_target, "#[{}] Body: {}", config.request_id(), serde_json::to_string(&json).unwrap_or_default());
+                log::debug!(target: config.log_target, "#[{}] Body(Json) {}", config.request_id(), serde_json::to_string(&json).unwrap_or_default());
             }
             json
         }
@@ -372,26 +371,49 @@ async fn parse_as_json(
         }
     }
 
-    // Deserialize payload
-    match serde_json::from_value(json) {
-        Ok(v) => Ok(ResponseBody::Json(v)),
+    Ok(ResponseBody::Json(json))
+}
+
+/// Parse response body to xml
+async fn parse_as_xml(
+    res: Response,
+    content_type: MimeType,
+    config: RequestConfig,
+) -> ApiResult<ResponseBody> {
+    // Decode response as text
+    let text = match res.text().await {
+        Ok(text) => {
+            if config.log_enabled {
+                log::debug!(target: config.log_target, "#[{}] Body(Xml) {}", config.request_id(), text);
+            }
+            text
+        }
         Err(e) => {
-            let e = ApiError::DecodeJson(e);
+            let e = ApiError::DecodeResponse(content_type, e.to_string());
             if config.log_enabled {
                 log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
             }
-            Err(e)
+            return Err(e);
         }
-    }
+    };
+
+    Ok(ResponseBody::Xml(text))
 }
 
+/// Parse response body to text
 async fn parse_as_text(
     res: Response,
-    content_type: String,
+    content_type: MimeType,
     config: RequestConfig,
 ) -> ApiResult<ResponseBody> {
+    // Decode response
     let text = match res.text().await {
-        Ok(text) => text,
+        Ok(text) => {
+            if config.log_enabled {
+                log::debug!(target: config.log_target, "#[{}] Body(Text) {}", config.request_id(), text);
+            }
+            text
+        }
         Err(e) => {
             let e = ApiError::DecodeResponse(content_type, e.to_string());
             if config.log_enabled {

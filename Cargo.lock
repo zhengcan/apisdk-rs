@@ -61,10 +61,10 @@ dependencies = [
 
 [[package]]
 name = "apisdk"
-version = "0.0.4-beta.1"
+version = "0.0.4-beta.2"
 dependencies = [
  "anyhow",
- "apisdk-macros 0.0.4-beta.1",
+ "apisdk-macros 0.0.4-beta.2",
  "async-trait",
  "base64",
  "futures",
@@ -75,6 +75,7 @@ dependencies = [
  "md-5",
  "nanoid",
  "opentelemetry 0.21.0",
+ "quick-xml",
  "rand",
  "reqwest",
  "reqwest-middleware",
@@ -108,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "apisdk-macros"
-version = "0.0.4-beta.1"
+version = "0.0.4-beta.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1093,6 +1094,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39278fbbf5fb4f646ce651690877f89d1c5811a3d4acb27700c1cb3cdb78fd3b"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
+dependencies = [
+ "memchr",
+ "serde",
 ]
 
 [[package]]

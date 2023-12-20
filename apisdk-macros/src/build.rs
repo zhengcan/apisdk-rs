@@ -1,6 +1,6 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{Attribute, GenericParam, Generics, Visibility};
+use syn::{Attribute, Visibility};
 
 use crate::parse::{parse_meta, ApiMeta};
 

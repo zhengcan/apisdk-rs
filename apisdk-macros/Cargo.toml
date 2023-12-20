@@ -1,6 +1,6 @@
 [package]
 name = "apisdk-macros"
-version = "0.0.4-beta.1"
+version = "0.0.4-beta.2"
 edition = "2021"
 license = "MIT"
 description = "A highlevel API client framework for Rust."

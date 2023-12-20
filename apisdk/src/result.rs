@@ -2,7 +2,7 @@ use reqwest::Url;
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::MiddlewareError;
+use crate::{MiddlewareError, MimeType};
 
 /// Route Error
 #[derive(Debug, Error)]
@@ -57,15 +57,21 @@ pub enum ApiError {
     /// Illegal Content-Type
     /// - 0: value of content-type
     #[error("Illegal Content-Type: {0}")]
-    IllegalContentType(String),
+    IllegalContentType(MimeType),
     /// Decode response error
     /// - 0: value of content-type
     /// - 1: message
     #[error("Decode response error: {0} => {1}")]
-    DecodeResponse(String, String),
+    DecodeResponse(MimeType, String),
     /// Decode json error
     #[error("Decode json error: {0}")]
     DecodeJson(#[from] serde_json::Error),
+    /// Decode xml error
+    #[error("Decode xml error: {0}")]
+    DecodeXml(#[from] quick_xml::DeError),
+    /// Decode text error
+    #[error("Decode text error")]
+    DecodeText,
     /// Illegal json
     #[error("Illegal json: {0}")]
     IllegalJson(Value),

@@ -4,6 +4,7 @@ mod core;
 mod digest;
 mod executor;
 mod extension;
+mod extractor;
 mod result;
 mod router;
 
@@ -11,6 +12,7 @@ pub use core::*;
 pub use digest::*;
 pub use executor::*;
 pub use extension::*;
+pub use extractor::*;
 pub use result::*;
 pub use router::*;
 

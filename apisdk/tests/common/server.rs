@@ -42,11 +42,21 @@ pub async fn start_server() {
 
 async fn do_start_server() {
     tokio::spawn(async move {
-        let dump_normal = warp::path!("v1" / "path" / "json")
+        let dump_json = warp::path!("v1" / "path" / "json")
             .and(warp::path::full())
             .and(warp::header::headers_cloned())
             .and(warp::query())
-            .and_then(handle_normal);
+            .and_then(handle_json);
+        let dump_xml = warp::path!("v1" / "path" / "xml")
+            .and(warp::path::full())
+            .and(warp::header::headers_cloned())
+            .and(warp::query())
+            .and_then(handle_xml);
+        let dump_text = warp::path!("v1" / "path" / "text")
+            .and(warp::path::full())
+            .and(warp::header::headers_cloned())
+            .and(warp::query())
+            .and_then(handle_text);
         let dump_form = warp::post()
             .and(warp::path!("v1" / "path" / "form"))
             .and(warp::path::full())
@@ -63,16 +73,23 @@ async fn do_start_server() {
             .and_then(handle_multipart);
         let not_found = warp::path!("v1" / "not-found").and_then(handle_not_found);
 
-        warp::serve(dump_normal.or(dump_form).or(dump_multipart).or(not_found))
-            .run(([127, 0, 0, 1], PORT))
-            .await;
+        warp::serve(
+            dump_json
+                .or(dump_xml)
+                .or(dump_text)
+                .or(dump_form)
+                .or(dump_multipart)
+                .or(not_found),
+        )
+        .run(([127, 0, 0, 1], PORT))
+        .await;
     });
 
     // Ensure the server is ready to work
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 }
 
-async fn handle_normal(
+async fn handle_json(
     path: FullPath,
     headers: HeaderMap,
     query: HashMap<String, String>,
@@ -96,6 +113,38 @@ async fn handle_normal(
         "extra-field": "extra"
     });
     Ok(warp::reply::json(&resp))
+}
+
+async fn handle_xml(
+    path: FullPath,
+    headers: HeaderMap,
+    query: HashMap<String, String>,
+) -> Result<impl Reply, warp::Rejection> {
+    warp::http::Response::builder()
+        .header("Content-Type", "text/xml")
+        .body(
+            r#"
+        <xml>
+            <code>0</code>
+            <data>
+                <hello>world</hello>
+            </data>
+        </xml>
+        "#
+            .trim(),
+        )
+        .map_err(|_| warp::reject())
+}
+
+async fn handle_text(
+    path: FullPath,
+    headers: HeaderMap,
+    query: HashMap<String, String>,
+) -> Result<impl Reply, warp::Rejection> {
+    warp::http::Response::builder()
+        .header("Content-Type", "text/plain")
+        .body("text goes here")
+        .map_err(|_| warp::reject())
 }
 
 async fn handle_form(
@@ -167,8 +216,9 @@ async fn handle_not_found() -> Result<String, warp::Rejection> {
     Err(warp::reject::not_found())
 }
 
-// #[tokio::test]
-// async fn standalone_server() {
-//     start_server().await;
-//     tokio::time::sleep(Duration::from_secs(60 * 5)).await
-// }
+#[tokio::test]
+#[ignore]
+async fn standalone_server() {
+    start_server().await;
+    tokio::time::sleep(Duration::from_secs(60 * 5)).await
+}

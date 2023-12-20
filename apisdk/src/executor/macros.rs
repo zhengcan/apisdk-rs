@@ -13,43 +13,6 @@ macro_rules! _function_path {
     }};
 }
 
-// /// Internal macro
-// #[macro_export]
-// #[doc(hidden)]
-// macro_rules! _is_trait {
-//     ($type:ty, $trait:path) => {{
-//         trait A {
-//             fn is(&self) -> bool;
-//         }
-
-//         struct B<T: ?Sized>(core::marker::PhantomData<T>);
-
-//         impl<T: ?Sized> core::ops::Deref for B<T> {
-//             type Target = ();
-//             fn deref(&self) -> &Self::Target {
-//                 &()
-//             }
-//         }
-
-//         impl<T: ?Sized> A for B<T>
-//         where
-//             T: $trait,
-//         {
-//             fn is(&self) -> bool {
-//                 true
-//             }
-//         }
-
-//         impl A for () {
-//             fn is(&self) -> bool {
-//                 false
-//             }
-//         }
-
-//         B::<$type>(core::marker::PhantomData).is()
-//     }};
-// }
-
 /// Send request
 ///
 /// # Examples
@@ -129,19 +92,45 @@ macro_rules! send {
             Ok(())
         }
     };
-    ($req:expr, $extractor:ty) => {
+    ($req:expr, Json) => {
+        $crate::send!($req, $crate::Json, ())
+    };
+    ($req:expr, Xml) => {
+        $crate::send!($req, $crate::Xml, ())
+    };
+    ($req:expr, Text) => {
+        $crate::send!($req, $crate::Text, ())
+    };
+    ($req:expr, $parser:ty, ()) => {
         async {
-            use $crate::Extractor;
+            let result = $crate::internal::_send(
+                $req,
+                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+            )
+            .await?;
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, Json<$ve:ty>) => {
+        $crate::send!($req, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $ve:ty) => {
+        $crate::send!($req, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $parser:ty, $vet:ty, $ve:ty) => {
+        async {
+            use $vet;
             let result = $crate::internal::_send(
                 $req,
                 $crate::internal::RequestConfigurator::new(
                     $crate::_function_path!(),
                     None,
-                    <$extractor>::require_headers(),
+                    <$ve>::require_headers(),
                 ),
             )
             .await?;
-            <$extractor>::try_extract(result)
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
         }
     };
 }
@@ -151,7 +140,11 @@ macro_rules! send {
 #[doc(hidden)]
 macro_rules! _send_with {
     ($req:expr, $config:expr) => {
-        $crate::internal::_send($req, $config.merge($crate::_function_path!(), true))
+        async {
+            $crate::internal::_send($req, $config.merge($crate::_function_path!(), true))
+                .await
+                .and_then(|c| c.try_into())
+        }
     };
     ($req:expr, (), $config:expr) => {
         async {
@@ -160,15 +153,39 @@ macro_rules! _send_with {
             Ok(())
         }
     };
-    ($req:expr, $extractor:ty, $config:expr) => {
+    ($req:expr, Json, $config:expr) => {
+        $crate::_send_with!($req, $crate::Json, (), $config)
+    };
+    ($req:expr, Xml, $config:expr) => {
+        $crate::_send_with!($req, $crate::Xml, (), $config)
+    };
+    ($req:expr, Text, $config:expr) => {
+        $crate::_send_with!($req, $crate::Text, (), $config)
+    };
+    ($req:expr, $parser:ty, (), $config:expr) => {
         async {
-            use $crate::Extractor;
+            let result =
+                $crate::internal::_send($req, $config.merge($crate::_function_path!(), false))
+                    .await?;
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, Json<$ve:ty>, $config:expr) => {
+        $crate::_send_with!($req, $crate::Json, $crate::JsonExtractor, $ve, $config)
+    };
+    ($req:expr, $ve:ty, $config:expr) => {
+        $crate::_send_with!($req, $crate::Json, $crate::JsonExtractor, $ve, $config)
+    };
+    ($req:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
+        async {
+            use $vet;
             let result = $crate::internal::_send(
                 $req,
-                $config.merge($crate::_function_path!(), <$extractor>::require_headers()),
+                $config.merge($crate::_function_path!(), <$ve>::require_headers()),
             )
             .await?;
-            <$extractor>::try_extract(result)
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
         }
     };
 }
@@ -210,20 +227,47 @@ macro_rules! send_json {
             Ok(())
         }
     };
-    ($req:expr, $json:expr, $extractor:ty) => {
+    ($req:expr, $json:expr, Json) => {
+        $crate::send_json!($req, $json, $crate::Json, ())
+    };
+    ($req:expr, $json:expr, Xml) => {
+        $crate::send_json!($req, $json, $crate::Xml, ())
+    };
+    ($req:expr, $json:expr, Text) => {
+        $crate::send_json!($req, $json, $crate::Text, ())
+    };
+    ($req:expr, $json:expr, $parser:ty, ()) => {
         async {
-            use $crate::Extractor;
+            let result = $crate::internal::_send_json(
+                $req,
+                &($json),
+                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+            )
+            .await?;
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, $json:expr, Json<$ve:ty>) => {
+        $crate::send_json!($req, $json, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $json:expr, $ve:ty) => {
+        $crate::send_json!($req, $json, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $json:expr, $parser:ty, $vet:ty, $ve:ty) => {
+        async {
+            use $vet;
             let result = $crate::internal::_send_json(
                 $req,
                 &($json),
                 $crate::internal::RequestConfigurator::new(
                     $crate::_function_path!(),
                     None,
-                    <$extractor>::require_headers(),
+                    <$ve>::require_headers(),
                 ),
             )
             .await?;
-            <$extractor>::try_extract(result)
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
         }
     };
 }
@@ -233,11 +277,15 @@ macro_rules! send_json {
 #[doc(hidden)]
 macro_rules! _send_json_with {
     ($req:expr, $json:expr, $config:expr) => {
-        $crate::internal::_send_json(
-            $req,
-            &($json),
-            $config.merge($crate::_function_path!(), true),
-        )
+        async {
+            $crate::internal::_send_json(
+                $req,
+                &($json),
+                $config.merge($crate::_function_path!(), true),
+            )
+            .await
+            .and_then(|c| c.try_into())
+        }
     };
     ($req:expr, $json:expr, (), $config:expr) => {
         async {
@@ -250,16 +298,57 @@ macro_rules! _send_json_with {
             Ok(())
         }
     };
-    ($req:expr, $json:expr, $extractor:ty, $config:expr) => {
+    ($req:expr, $json:expr, Json, $config:expr) => {
+        $crate::_send_json_with!($req, $json, $crate::Json, (), $config)
+    };
+    ($req:expr, $json:expr, Xml, $config:expr) => {
+        $crate::_send_json_with!($req, $json, $crate::Xml, (), $config)
+    };
+    ($req:expr, $json:expr, Text, $config:expr) => {
+        $crate::_send_json_with!($req, $json, $crate::Text, (), $config)
+    };
+    ($req:expr, $json:expr, $parser:ty, (), $config:expr) => {
         async {
-            use $crate::Extractor;
             let result = $crate::internal::_send_json(
                 $req,
                 &($json),
-                $config.merge($crate::_function_path!(), <$extractor>::require_headers()),
+                $config.merge($crate::_function_path!(), false),
             )
             .await?;
-            <$extractor>::try_extract(result)
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, $json:expr, Json<$ve:ty>, $config:expr) => {
+        $crate::_send_json_with!(
+            $req,
+            $json,
+            $crate::Json,
+            $crate::JsonExtractor,
+            $ve,
+            $config
+        )
+    };
+    ($req:expr, $json:expr, $ve:ty, $config:expr) => {
+        $crate::_send_json_with!(
+            $req,
+            $json,
+            $crate::Json,
+            $crate::JsonExtractor,
+            $ve,
+            $config
+        )
+    };
+    ($req:expr, $json:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
+        async {
+            use $vet;
+            let result = $crate::internal::_send_json(
+                $req,
+                &($json),
+                $config.merge($crate::_function_path!(), <$ve>::require_headers()),
+            )
+            .await?;
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
         }
     };
 }
@@ -314,20 +403,47 @@ macro_rules! send_form {
             Ok(())
         }
     };
-    ($req:expr, $form:expr, $extractor:ty) => {
+    ($req:expr, $form:expr, Json) => {
+        $crate::send_form!($req, $form, $crate::Json, ())
+    };
+    ($req:expr, $form:expr, Xml) => {
+        $crate::send_form!($req, $form, $crate::Xml, ())
+    };
+    ($req:expr, $form:expr, Text) => {
+        $crate::send_form!($req, $form, $crate::Text, ())
+    };
+    ($req:expr, $form:expr, $parser:ty, ()) => {
         async {
-            use $crate::Extractor;
+            let result = $crate::internal::_send_form(
+                $req,
+                $form,
+                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+            )
+            .await?;
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, $form:expr, Json<$ve:ty>) => {
+        $crate::send_form!($req, $form, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $form:expr, $ve:ty) => {
+        $crate::send_form!($req, $form, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty) => {
+        async {
+            use $vet;
             let result = $crate::internal::_send_form(
                 $req,
                 $form,
                 $crate::internal::RequestConfigurator::new(
                     $crate::_function_path!(),
                     None,
-                    <$extractor>::require_headers(),
+                    <$ve>::require_headers(),
                 ),
             )
             .await?;
-            <$extractor>::try_extract(result)
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
         }
     };
 }
@@ -358,16 +474,57 @@ macro_rules! _send_form_with {
             Ok(())
         }
     };
-    ($req:expr, $form:expr, $extractor:ty, $config:expr) => {
+    ($req:expr, $form:expr, Json, $config:expr) => {
+        $crate::_send_form_with!($req, $form, $crate::Json, (), $config)
+    };
+    ($req:expr, $form:expr, Xml, $config:expr) => {
+        $crate::_send_form_with!($req, $form, $crate::Xml, (), $config)
+    };
+    ($req:expr, $form:expr, Text, $config:expr) => {
+        $crate::_send_form_with!($req, $form, $crate::Text, (), $config)
+    };
+    ($req:expr, $form:expr, $parser:ty, (), $config:expr) => {
         async {
-            use $crate::Extractor;
             let result = $crate::internal::_send_form(
                 $req,
                 $form,
-                $config.merge($crate::_function_path!(), <$extractor>::require_headers()),
+                $config.merge($crate::_function_path!(), false),
             )
             .await?;
-            <$extractor>::try_extract(result)
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, $form:expr, Json<$ve:ty>, $config:expr) => {
+        $crate::_send_form_with!(
+            $req,
+            $form,
+            $crate::Json,
+            $crate::JsonExtractor,
+            $ve,
+            $config
+        )
+    };
+    ($req:expr, $form:expr, $ve:ty, $config:expr) => {
+        $crate::_send_form_with!(
+            $req,
+            $form,
+            $crate::Json,
+            $crate::JsonExtractor,
+            $ve,
+            $config
+        )
+    };
+    ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
+        async {
+            use $vet;
+            let result = $crate::internal::_send_form(
+                $req,
+                $form,
+                $config.merge($crate::_function_path!(), <$ve>::require_headers()),
+            )
+            .await?;
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
         }
     };
 }
@@ -411,20 +568,47 @@ macro_rules! send_multipart {
             Ok(())
         }
     };
-    ($req:expr, $form:expr, $extractor:ty) => {
+    ($req:expr, $form:expr, Json) => {
+        $crate::send_multipart!($req, $form, $crate::Json, ())
+    };
+    ($req:expr, $form:expr, Xml) => {
+        $crate::send_multipart!($req, $form, $crate::Xml, ())
+    };
+    ($req:expr, $form:expr, Text) => {
+        $crate::send_multipart!($req, $form, $crate::Text, ())
+    };
+    ($req:expr, $form:expr, $parser:ty, ()) => {
         async {
-            use $crate::Extractor;
+            let result = $crate::internal::_send_multipart(
+                $req,
+                $form,
+                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+            )
+            .await?;
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, $form:expr, Json<$ve:ty>) => {
+        $crate::send_multipart!($req, $form, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $form:expr, $ve:ty) => {
+        $crate::send_multipart!($req, $form, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty) => {
+        async {
+            use $vet;
             let result = $crate::internal::_send_multipart(
                 $req,
                 $form,
                 $crate::internal::RequestConfigurator::new(
                     $crate::_function_path!(),
                     None,
-                    <$extractor>::require_headers(),
+                    <$ve>::require_headers(),
                 ),
             )
             .await?;
-            <$extractor>::try_extract(result)
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
         }
     };
 }
@@ -455,16 +639,57 @@ macro_rules! _send_multipart_with {
             Ok(())
         }
     };
-    ($req:expr, $form:expr, $extractor:ty, $config:expr) => {
+    ($req:expr, $form:expr, Json, $config:expr) => {
+        $crate::_send_multipart_with!($req, $form, $crate::Json, (), $config)
+    };
+    ($req:expr, $form:expr, Xml, $config:expr) => {
+        $crate::_send_multipart_with!($req, $form, $crate::Xml, (), $config)
+    };
+    ($req:expr, $form:expr, Text, $config:expr) => {
+        $crate::_send_multipart_with!($req, $form, $crate::Text, (), $config)
+    };
+    ($req:expr, $form:expr, $parser:ty, (), $config:expr) => {
         async {
-            use $crate::Extractor;
             let result = $crate::internal::_send_multipart(
                 $req,
                 $form,
-                $config.merge($crate::_function_path!(), <$extractor>::require_headers()),
+                $config.merge($crate::_function_path!(), false),
             )
             .await?;
-            <$extractor>::try_extract(result)
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, $form:expr, Json<$ve:ty>, $config:expr) => {
+        $crate::_send_multipart_with!(
+            $req,
+            $form,
+            $crate::Json,
+            $crate::JsonExtractor,
+            $ve,
+            $config
+        )
+    };
+    ($req:expr, $form:expr, $ve:ty, $config:expr) => {
+        $crate::_send_multipart_with!(
+            $req,
+            $form,
+            $crate::Json,
+            $crate::JsonExtractor,
+            $ve,
+            $config
+        )
+    };
+    ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
+        async {
+            use $vet;
+            let result = $crate::internal::_send_multipart(
+                $req,
+                $form,
+                $config.merge($crate::_function_path!(), <$ve>::require_headers()),
+            )
+            .await?;
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
         }
     };
 }

@@ -5,7 +5,9 @@ A highlevel API client framework for Rust.
 - Built on top of [reqwest](https://github.com/seanmonstar/reqwest/) to handle HTTP requests
 - Macros to define API and send requests
 - Send request as JSON / form / multipart
-- Parse response by [serde](https://serde.rs/), and extract a part of payload as result value
+- Parse response by [serde](https://serde.rs/)
+    - Use [serde_json](https://github.com/serde-rs/json) to process JSON response
+    - Use [quick-xml](https://github.com/tafia/quick-xml) to process XML response
 - Support `X-Request-ID` and `X-Trace-ID`/`X-Span-ID`
 - More customizations
     - Rewrite `host` and `port` of URLs by using `ApiRouter`
@@ -126,4 +128,26 @@ This crate re-export `RequestBuilder` from `reqwest-middleware`, and provides se
 - `send_multipart`
     - send request with multipart form
 
+```
+// Form 1: send and parse JSON response to Data
+let _: Data = send!(req).await;
+
+// Form 2: send and parse JSON response to Data
+let _ = send!(req, Data).await;
+
+// Form 3: send and parse JSON response to Data
+let _: Data = send!(req, Json).await;
+
+// Form 4: send and parse XML response to Data
+let _: Data = send!(req, Xml).await;
+
+// Form 5: send and parse Text response to Data by using FromStr trait
+let _: Data = send!(req, Text).await;
+
+// Form 6: send and parse JSON response to Data
+let _ = send!(req, Json<Data>).await;
+
+// Form 7: send, drop response and return ApiResult<()>
+send!(req, ()).await;
+```
 
