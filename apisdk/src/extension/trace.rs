@@ -80,9 +80,9 @@ impl TraceId {
 
 /// This struct is used to inject RequestId and/or TraceId to request
 #[derive(Default)]
-pub(crate) struct RequestTraceIdInjector;
+pub(crate) struct RequestTraceIdMiddleware;
 
-impl RequestTraceIdInjector {
+impl RequestTraceIdMiddleware {
     /// This function will be invoked at the very beginning of send()
     pub(crate) fn inject_extension(req: RequestBuilder) -> RequestBuilder {
         let mut req = req;
@@ -139,20 +139,9 @@ impl RequestTraceIdInjector {
     }
 }
 
-// /// The injector will inject new ids as default.
-// /// Developers can overwrite them.
-// #[async_trait]
-// impl RequestInitialiser for RequestTraceIdInjector {
-//     fn init(&self, req: RequestBuilder) -> RequestBuilder {
-//         let new_id = generate_id();
-//         req.with_extension(RequestId::new(&new_id))
-//             .with_extension(TraceId::new(&new_id, None::<&str>))
-//     }
-// }
-
 /// Using `Middleware`, the injector will set request headers
 #[async_trait]
-impl Middleware for RequestTraceIdInjector {
+impl Middleware for RequestTraceIdMiddleware {
     async fn handle(
         &self,
         req: Request,

@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use reqwest::header::HOST;
-
 use crate::{
     ApiError, ApiResult, ApiRouter, ApiSignature, Client, ClientBuilder, Initialiser, IntoUrl,
-    Method, Middleware, OriginalEndpoint, RequestBuilder, RequestTraceIdInjector,
-    SignatureMiddleware, Url,
+    LogConfig, LogMiddleware, Method, Middleware, OriginalEndpoint, RequestBuilder,
+    RequestTraceIdMiddleware, RewriteHost, RewriteHostMiddleware, SignatureMiddleware, Url,
 };
 
 /// This struct is used to build an instance of ApiCore
@@ -18,6 +16,8 @@ pub struct ApiBuilder {
     router: Option<Arc<dyn ApiRouter>>,
     /// The holder of ApiSignature
     signature: Option<Arc<dyn ApiSignature>>,
+    /// The holder of LogConfig
+    logger: Option<Arc<LogConfig>>,
     /// The initialisers for Reqwest
     initialisers: Vec<Arc<dyn Initialiser>>,
     /// The middlewares for Reqwest
@@ -28,15 +28,14 @@ impl ApiBuilder {
     /// Create an instance of ApiBuilder
     /// - base_url: base url for target api
     pub fn new(base_url: impl IntoUrl + std::fmt::Debug) -> ApiResult<Self> {
-        let request_trace_id_injector = Arc::new(RequestTraceIdInjector {});
-
         Ok(Self {
             client: ClientBuilder::default(),
             base_url: base_url.into_url().map_err(ApiError::InvalidUrl)?,
             router: None,
             signature: None,
+            logger: None,
             initialisers: vec![],
-            middlewares: vec![request_trace_id_injector],
+            middlewares: vec![],
         })
     }
 
@@ -48,7 +47,10 @@ impl ApiBuilder {
 
     /// Set the ApiRouter
     /// - router: ApiRouter
-    pub fn with_router(self, router: impl ApiRouter) -> Self {
+    pub fn with_router<T>(self, router: T) -> Self
+    where
+        T: ApiRouter,
+    {
         Self {
             router: Some(Arc::new(router)),
             ..self
@@ -57,16 +59,34 @@ impl ApiBuilder {
 
     /// Set the ApiSignature
     /// - signature: ApiSignature
-    pub fn with_signature(self, signature: impl ApiSignature) -> Self {
+    pub fn with_signature<T>(self, signature: T) -> Self
+    where
+        T: ApiSignature,
+    {
         Self {
             signature: Some(Arc::new(signature)),
             ..self
         }
     }
 
+    /// Set the LogConfig
+    /// - logger: LogConfig
+    pub fn with_logger<T>(self, logger: T) -> Self
+    where
+        T: Into<LogConfig>,
+    {
+        Self {
+            logger: Some(Arc::new(logger.into())),
+            ..self
+        }
+    }
+
     /// Add initialiser
     /// - initialiser: Reqwest Initialiser
-    pub fn with_initialiser(self, initialiser: impl Initialiser) -> Self {
+    pub fn with_initialiser<T>(self, initialiser: T) -> Self
+    where
+        T: Initialiser,
+    {
         let mut s = self;
         s.initialisers.push(Arc::new(initialiser));
         s
@@ -74,7 +94,10 @@ impl ApiBuilder {
 
     /// Add middleware
     /// - middleware: Reqwest Middleware
-    pub fn with_middleware(self, middleware: impl Middleware) -> Self {
+    pub fn with_middleware<T>(self, middleware: T) -> Self
+    where
+        T: Middleware,
+    {
         let mut s = self;
         s.middlewares.push(Arc::new(middleware));
         s
@@ -83,14 +106,26 @@ impl ApiBuilder {
     /// Build an instance of ApiCore
     pub fn build(self) -> ApiCore {
         let mut client = reqwest_middleware::ClientBuilder::new(self.client.build().unwrap());
-        for initialiser in self.initialisers {
-            client = client.with_arc_init(initialiser);
-        }
+
+        // Apply middleware in correct order
+        client = client.with(RequestTraceIdMiddleware);
+        client = client.with(RewriteHostMiddleware);
         for middleware in self.middlewares {
             client = client.with_arc(middleware);
         }
         if self.signature.is_some() {
             client = client.with(SignatureMiddleware);
+        }
+        if self.logger.is_some() {
+            client = client.with(LogMiddleware);
+        }
+
+        // Apply initialisers
+        if let Some(logger) = self.logger {
+            client = client.with_arc_init(logger);
+        };
+        for initialiser in self.initialisers {
+            client = client.with_arc_init(initialiser);
         }
 
         ApiCore {
@@ -131,17 +166,27 @@ impl std::fmt::Debug for ApiCore {
 }
 
 impl ApiCore {
+    pub fn rebase(&self, base_url: impl IntoUrl) -> ApiResult<Self> {
+        Ok(Self {
+            client: self.client.clone(),
+            base_url: base_url.into_url().map_err(ApiError::InvalidUrl)?,
+            router: self.router.clone(),
+            signature: self.signature.clone(),
+        })
+    }
+
     /// Build a new request url
     /// - path: relative path to base_uri
     ///
     /// Return error when failed to retrieve valid endpoint from ApiRouter
-    pub async fn build_url(&self, path: impl AsRef<str>) -> ApiResult<Url> {
+    pub async fn build_url(&self, path: impl AsRef<str>) -> ApiResult<(Url, bool)> {
         let endpoint = match self.router.as_ref() {
             Some(router) => router.next_endpoint().await?,
             None => Box::new(OriginalEndpoint::default()),
         };
         endpoint
             .build_url(&self.base_url, path.as_ref())
+            .map(|url| (url, endpoint.reserve_original_host()))
             .map_err(|e| e.into())
     }
 
@@ -153,18 +198,13 @@ impl ApiCore {
         method: Method,
         path: impl AsRef<str>,
     ) -> ApiResult<RequestBuilder> {
-        let url = self.build_url(path).await?;
+        let (url, reserve_original_host) = self.build_url(path).await?;
         let mut req = self.client.request(method, url);
 
-        // Keep orginal HOST if required
-        if !self
-            .router
-            .as_ref()
-            .map(|r| r.rewrite_host())
-            .unwrap_or_default()
-        {
+        // Keep original HOST if required
+        if reserve_original_host {
             if let Some(host) = self.base_url.host_str() {
-                req = req.header(HOST, host);
+                req = req.with_extension(RewriteHost::new(host));
             }
         }
 

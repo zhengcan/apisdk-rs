@@ -3,7 +3,7 @@ use std::{any::TypeId, collections::HashMap};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{ApiError, ApiResult};
+use crate::{ApiError, ApiResult, MimeType};
 
 use super::ResponseBody;
 
@@ -22,12 +22,15 @@ impl Json {
                 let type_id = TypeId::of::<T>();
                 if type_id == TypeId::of::<String>() {
                     let value = serde_json::Value::String(json.to_string());
-                    serde_json::from_value(value).map_err(|_| ApiError::Other)
+                    serde_json::from_value(value).map_err(ApiError::DecodeJson)
                 } else {
                     serde_json::from_value(json).map_err(ApiError::DecodeJson)
                 }
             }
-            _ => Err(ApiError::Other),
+            _ => Err(ApiError::IncompatibleContentType(
+                MimeType::Json,
+                body.mime_type(),
+            )),
         }
     }
 }
@@ -265,46 +268,11 @@ impl JsonExtractor for CodeDataMessage {
             }
             code => {
                 // Build error when `code` is not 0
-                Err(ApiError::BusinessError(code, self.message))
+                Err(ApiError::ServiceError(code, self.message))
             }
         }
     }
 }
-
-// impl Extractor for CodeDataMessage {
-//     fn try_extract<T>(body: ResponseBody) -> ApiResult<T>
-//     where
-//         T: TryFrom<ResponseBody>,
-//         T::Error: Into<ApiError>,
-//     {
-//         match body {
-//             ResponseBody::Json(mut value) => {
-//                 match value.get("code").and_then(|c| c.as_i64()) {
-//                     // Extract `data` field when `code` is 0
-//                     Some(0) => match value.get_mut("data") {
-//                         Some(data) => {
-//                             T::try_from(ResponseBody::Json(data.take())).map_err(|e| e.into())
-//                         }
-//                         None => T::try_from(ResponseBody::Json(Value::Null)).map_err(|e| e.into()),
-//                     },
-//                     // Build error when `code` is not 0
-//                     Some(code) => {
-//                         let message = value
-//                             .get("message")
-//                             .or_else(|| value.get("msg"))
-//                             .and_then(|m| m.as_str())
-//                             .map(|m| m.to_string());
-//                         Err(ApiError::BusinessError(code, message))
-//                     }
-//                     // Failed to parse without `code` field
-//                     None => Err(ApiError::IllegalJson(value)),
-//                 }
-//             }
-//             ResponseBody::Xml(_xml) => Err(ApiError::Other),
-//             ResponseBody::Text(_text) => Err(ApiError::Other),
-//         }
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

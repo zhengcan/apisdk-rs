@@ -54,10 +54,12 @@ pub enum ApiError {
     /// HTTP Server status error
     #[error("HTTP Server status error: [{0}] {1}")]
     HttpServerStatus(u16, String),
-    /// Illegal Content-Type
-    /// - 0: value of content-type
-    #[error("Illegal Content-Type: {0}")]
-    IllegalContentType(MimeType),
+    /// Unsupported Content-Type
+    #[error("Unsupported Content-Type: {0}")]
+    UnsupportedContentType(MimeType),
+    /// Incompatible Content-Type
+    #[error("Incompatible Content-Type: perfer {0}, actual {1}")]
+    IncompatibleContentType(MimeType, MimeType),
     /// Decode response error
     /// - 0: value of content-type
     /// - 1: message
@@ -75,16 +77,17 @@ pub enum ApiError {
     /// Illegal json
     #[error("Illegal json: {0}")]
     IllegalJson(Value),
-    /// Business error
-    #[error("Business error: {0} - {1:?}")]
-    BusinessError(i64, Option<String>),
-    #[error("Other error")]
-    Other,
+    /// Service error
+    #[error("Service error: {0} - {1:?}")]
+    ServiceError(i64, Option<String>),
+    /// Other error
+    #[error("Other error: {0}")]
+    Other(String),
 }
 
 impl ApiError {
     pub fn new(code: i64, message: impl ToString) -> Self {
-        Self::BusinessError(code, Some(message.to_string()))
+        Self::ServiceError(code, Some(message.to_string()))
     }
 }
 

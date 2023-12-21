@@ -136,16 +136,14 @@ impl Carrier {
         let token = token.to_string();
         match self {
             Carrier::BearerAuth => {
-                req.headers_mut().remove(AUTHORIZATION);
-                req.headers_mut().append(
+                req.headers_mut().insert(
                     AUTHORIZATION,
                     HeaderValue::try_from(format!("Bearer {}", token)).unwrap(),
                 );
             }
             Carrier::SchemelessAuth => {
-                req.headers_mut().remove(AUTHORIZATION);
                 req.headers_mut()
-                    .append(AUTHORIZATION, HeaderValue::try_from(token).unwrap());
+                    .insert(AUTHORIZATION, HeaderValue::try_from(token).unwrap());
             }
             Carrier::Header(name) => {
                 req.headers_mut().append(

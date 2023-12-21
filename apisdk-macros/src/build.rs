@@ -29,28 +29,28 @@ pub(crate) fn build_builder(
             }
 
             /// Set ApiRouter
-            #vis fn with_router(self, router: impl apisdk::ApiRouter) -> Self {
+            #vis fn with_router<T>(self, router: T) -> Self where T: apisdk::ApiRouter {
                 Self {
                     inner: self.inner.with_router(router)
                 }
             }
 
             /// Set ApiSignature
-            #vis fn with_signature(self, signature: impl apisdk::ApiSignature) -> Self {
+            #vis fn with_signature<T>(self, signature: T) -> Self where T: apisdk::ApiSignature {
                 Self {
                     inner: self.inner.with_signature(signature)
                 }
             }
 
             /// Set initialiser
-            #vis fn with_initialiser(self, initialiser: impl apisdk::Initialiser) -> Self {
+            #vis fn with_initialiser<T>(self, initialiser: T) -> Self where T: apisdk::Initialiser {
                 Self {
                     inner: self.inner.with_initialiser(initialiser)
                 }
             }
 
             /// Add middleware
-            #vis fn with_middleware(self, middleware: impl apisdk::Middleware) -> Self {
+            #vis fn with_middleware<T>(self, middleware: T) -> Self where T: apisdk::Middleware {
                 Self {
                     inner: self.inner.with_middleware(middleware)
                 }
@@ -59,7 +59,7 @@ pub(crate) fn build_builder(
             /// Enable/disable log
             #vis fn with_log(self, enabled: bool) -> Self {
                 Self {
-                    inner: self.inner.with_initialiser(apisdk::LogConfig::new(enabled))
+                    inner: self.inner.with_logger(apisdk::LogConfig::new(enabled))
                 }
             }
 
@@ -115,7 +115,7 @@ pub(crate) fn build_api_impl(
                 &self,
                 path: impl AsRef<str>,
             ) -> apisdk::ApiResult<apisdk::Url> {
-                self.core.build_url(path).await
+                self.core.build_url(path).await.map(|(url, _)| url)
             }
 
             /// Build a new HTTP request

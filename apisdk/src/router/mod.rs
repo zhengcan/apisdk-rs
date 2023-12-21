@@ -80,6 +80,10 @@ impl ApiRouters {
 
 /// This trait is used to build urls
 pub trait ApiEndpoint {
+    fn reserve_original_host(&self) -> bool {
+        false
+    }
+
     /// Build request url
     /// - base: original base url
     /// - path: relative path
@@ -183,5 +187,23 @@ impl ApiEndpoint for DefaultApiEndpoint {
             .map_err(|_| RouteError::UpdatePort(base.clone(), self.port))?;
         self.merge_path(&mut url, path);
         Ok(url)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{ApiRouter, ApiRouters};
+
+    fn dump_router<T>(router: T)
+    where
+        T: ApiRouter,
+    {
+        println!("router = {}", router.type_name());
+    }
+
+    #[test]
+    fn test_box_router() {
+        let boxed: Box<dyn ApiRouter> = Box::new(ApiRouters::fixed(("127.0.0.1", 80)));
+        dump_router(boxed);
     }
 }

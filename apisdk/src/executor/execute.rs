@@ -5,8 +5,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::{
-    ApiError, ApiResult, FormLike, LogConfig, MimeType, MockServer, RequestBuilder, RequestId,
-    RequestTraceIdInjector, Responder, ResponseBody,
+    ApiError, ApiResult, FormLike, LogConfig, Logger, MimeType, MockServer, RequestBuilder,
+    RequestId, RequestTraceIdMiddleware, Responder, ResponseBody,
 };
 
 /// This struct is used to build RequestConfig internally by macros.
@@ -39,8 +39,8 @@ impl RequestConfigurator {
         }
     }
 
-    /// Build RequestConfig
-    fn build(self, req: &mut RequestBuilder) -> RequestConfig {
+    /// Build Logger
+    fn build(self, req: &mut RequestBuilder) -> (Logger, bool) {
         let extensions = req.extensions();
 
         let request_id = extensions
@@ -52,31 +52,14 @@ impl RequestConfigurator {
             .get::<LogConfig>()
             .map(|log_config| log_config.enabled)
             .unwrap_or_default();
-        RequestConfig {
-            log_target: self.log_target,
-            log_enabled: self.log_enabled.unwrap_or(log_enabled),
-            require_headers: self.require_headers,
-            request_id,
-        }
-    }
-}
-
-/// This config is used to control the send process
-#[derive(Debug, Default)]
-struct RequestConfig {
-    /// The target of log
-    log_target: &'static str,
-    /// Indicate whether to log
-    log_enabled: bool,
-    /// Indicate whether to parse headers from response or not
-    require_headers: bool,
-    /// The X-Request-ID value
-    request_id: String,
-}
-
-impl RequestConfig {
-    pub fn request_id(&self) -> &str {
-        self.request_id.as_str()
+        (
+            Logger::new(
+                self.log_target,
+                self.log_enabled.unwrap_or(log_enabled),
+                request_id,
+            ),
+            self.require_headers,
+        )
     }
 }
 
@@ -87,14 +70,14 @@ pub async fn _send(
     mut req: RequestBuilder,
     config: RequestConfigurator,
 ) -> ApiResult<ResponseBody> {
-    req = RequestTraceIdInjector::inject_extension(req);
+    req = RequestTraceIdMiddleware::inject_extension(req);
 
-    let config = config.build(&mut req);
-    if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
+    let (logger, require_headers) = config.build(&mut req);
+    if logger.log_enabled {
+        req = req.with_extension(logger.clone());
     }
 
-    send_and_parse(req, config).await
+    send_and_parse(req, logger, require_headers).await
 }
 
 /// Send request with JSON payload
@@ -109,17 +92,20 @@ pub async fn _send_json<I>(
 where
     I: Serialize + ?Sized,
 {
-    req = RequestTraceIdInjector::inject_extension(req);
+    req = RequestTraceIdMiddleware::inject_extension(req);
 
     req = req.json(json);
 
-    let config = config.build(&mut req);
-    if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
-        log::debug!(target: config.log_target, "#[{}] Json {}", config.request_id(), serde_json::to_string(json).unwrap_or_default());
+    let (logger, require_headers) = config.build(&mut req);
+    if logger.log_enabled {
+        req = req.with_extension(
+            logger
+                .clone()
+                .with_json(serde_json::to_value(json).unwrap_or_default()),
+        );
     }
 
-    send_and_parse(req, config).await
+    send_and_parse(req, logger, require_headers).await
 }
 
 /// Send request with form payload
@@ -134,7 +120,7 @@ pub async fn _send_form<I>(
 where
     I: FormLike,
 {
-    req = RequestTraceIdInjector::inject_extension(req);
+    req = RequestTraceIdMiddleware::inject_extension(req);
 
     let is_multipart = form.is_multipart();
     let meta = form.get_meta();
@@ -147,13 +133,17 @@ where
         req = req.form(&form);
     };
 
-    let config = config.build(&mut req);
-    if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
-        log::debug!(target: config.log_target, "#[{}] {} {:?}", config.request_id(), if is_multipart { "Multipart"} else {"Form"}, meta);
+    let (logger, require_headers) = config.build(&mut req);
+    if logger.log_enabled {
+        let logger = if is_multipart {
+            logger.clone().with_multipart(meta);
+        } else {
+            logger.clone().with_form(meta);
+        };
+        req = req.with_extension(logger);
     }
 
-    send_and_parse(req, config).await
+    send_and_parse(req, logger, require_headers).await
 }
 
 /// Send request with multipart/data payload
@@ -168,17 +158,18 @@ pub async fn _send_multipart<I>(
 where
     I: FormLike,
 {
-    req = RequestTraceIdInjector::inject_extension(req);
+    req = RequestTraceIdMiddleware::inject_extension(req);
 
     let form = form.get_multipart().ok_or(ApiError::MultipartForm)?;
+    let meta = form.get_meta();
     req = req.multipart(form);
 
-    let config = config.build(&mut req);
-    if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
+    let (logger, require_headers) = config.build(&mut req);
+    if logger.log_enabled {
+        req = req.with_extension(logger.clone().with_multipart(meta));
     }
 
-    send_and_parse(req, config).await
+    send_and_parse(req, logger, require_headers).await
 }
 
 /// Send request, and get raw response
@@ -188,32 +179,30 @@ pub async fn _send_raw(
     mut req: RequestBuilder,
     config: RequestConfigurator,
 ) -> ApiResult<Response> {
-    req = RequestTraceIdInjector::inject_extension(req);
+    req = RequestTraceIdMiddleware::inject_extension(req);
 
-    let config = config.build(&mut req);
-    if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), req);
+    let (logger, _) = config.build(&mut req);
+    if logger.log_enabled {
+        req = req.with_extension(logger.clone());
     }
 
-    send_and_unparse(req, config).await
+    send_and_unparse(req, logger).await
 }
 
 /// Send request, and return unparsed response
 /// - req: the request to send
-/// - config: control the send process
-async fn send_and_unparse(mut req: RequestBuilder, config: RequestConfig) -> ApiResult<Response> {
+/// - logger: helper to log messages
+async fn send_and_unparse(mut req: RequestBuilder, logger: Logger) -> ApiResult<Response> {
     let extensions = req.extensions();
 
     // Mock
     if let Some(mock) = extensions.get::<MockServer>().cloned() {
         let req = req.build().map_err(ApiError::BuildRequest)?;
-        if config.log_enabled {
-            log::debug!(target: config.log_target, "#[{}] Response (MOCK)", config.request_id());
-        }
+        logger.log_mock_request_and_response(&req, mock.type_name());
         let url = req.url().clone();
         match mock.handle(req).await {
             Ok(body) => {
-                log_body(&body, &config);
+                logger.log_mock_response_body(&body);
                 let (content_type, text) = match body {
                     ResponseBody::Json(json) => (MimeType::Json, json.to_string()),
                     ResponseBody::Xml(xml) => (MimeType::Xml, xml),
@@ -229,43 +218,38 @@ async fn send_and_unparse(mut req: RequestBuilder, config: RequestConfig) -> Api
                 return Ok(Response::from(res));
             }
             Err(e) => {
-                if config.log_enabled {
-                    log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
-                }
+                logger.log_error(&e);
                 return Err(ApiError::Middleware(e));
             }
         }
     }
 
     let res = req.send().await?;
-    if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), res);
-    }
-
     Ok(res)
 }
 
 /// Send request, and parse response as desired type
 /// - req: the request to send
-/// - config: control the send process
-async fn send_and_parse(mut req: RequestBuilder, config: RequestConfig) -> ApiResult<ResponseBody> {
+/// - logger: helper to log messages
+/// - require_headers: should zip headers into response body
+async fn send_and_parse(
+    mut req: RequestBuilder,
+    logger: Logger,
+    require_headers: bool,
+) -> ApiResult<ResponseBody> {
     let extensions = req.extensions();
 
     // Mock
     if let Some(mock) = extensions.get::<MockServer>().cloned() {
         let req = req.build().map_err(ApiError::BuildRequest)?;
-        if config.log_enabled {
-            log::debug!(target: config.log_target, "#[{}] Response (MOCK)", config.request_id());
-        }
+        logger.log_mock_request_and_response(&req, mock.type_name());
         match mock.handle(req).await {
             Ok(body) => {
-                log_body(&body, &config);
+                logger.log_mock_response_body(&body);
                 return Ok(body);
             }
             Err(e) => {
-                if config.log_enabled {
-                    log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
-                }
+                logger.log_error(&e);
                 return Err(ApiError::Middleware(e));
             }
         }
@@ -273,9 +257,6 @@ async fn send_and_parse(mut req: RequestBuilder, config: RequestConfig) -> ApiRe
 
     // Send the request
     let res = req.send().await?;
-    if config.log_enabled {
-        log::debug!(target: config.log_target, "#[{}] {:?}", config.request_id(), res);
-    }
 
     // Check status code
     let status = res.status();
@@ -285,9 +266,7 @@ async fn send_and_parse(mut req: RequestBuilder, config: RequestConfig) -> ApiRe
         } else {
             ApiError::HttpServerStatus(status.as_u16(), status.to_string())
         };
-        if config.log_enabled {
-            log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
-        }
+        logger.log_error(&e);
         return Err(e);
     } else {
         res
@@ -301,27 +280,10 @@ async fn send_and_parse(mut req: RequestBuilder, config: RequestConfig) -> ApiRe
         .map(MimeType::from)
         .unwrap_or(MimeType::Text);
     match content_type {
-        MimeType::Json => parse_as_json(res, content_type, config).await,
-        MimeType::Xml => parse_as_xml(res, content_type, config).await,
-        MimeType::Text => parse_as_text(res, content_type, config).await,
-        _ => Err(ApiError::IllegalContentType(content_type)),
-    }
-}
-
-/// Log response body
-fn log_body(body: &ResponseBody, config: &RequestConfig) {
-    if config.log_enabled {
-        match body {
-            ResponseBody::Json(json) => {
-                log::debug!(target: config.log_target, "#[{}] Body(Json) {}", config.request_id(), serde_json::to_string(json).unwrap_or_default());
-            }
-            ResponseBody::Xml(xml) => {
-                log::debug!(target: config.log_target, "#[{}] Body(Xml) {}", config.request_id(), xml);
-            }
-            ResponseBody::Text(text) => {
-                log::debug!(target: config.log_target, "#[{}] Body(Text) {}", config.request_id(), text);
-            }
-        }
+        MimeType::Json => parse_as_json(res, content_type, logger, require_headers).await,
+        MimeType::Xml => parse_as_xml(res, content_type, logger).await,
+        MimeType::Text => parse_as_text(res, content_type, logger).await,
+        _ => Err(ApiError::UnsupportedContentType(content_type)),
     }
 }
 
@@ -329,10 +291,11 @@ fn log_body(body: &ResponseBody, config: &RequestConfig) {
 async fn parse_as_json(
     res: Response,
     content_type: MimeType,
-    config: RequestConfig,
+    logger: Logger,
+    require_headers: bool,
 ) -> ApiResult<ResponseBody> {
     // Extract HTTP headers from response
-    let headers = if config.require_headers {
+    let headers = if require_headers {
         let mut headers = HashMap::new();
         for (name, value) in res.headers() {
             if let Ok(value) = value.to_str() {
@@ -347,16 +310,12 @@ async fn parse_as_json(
     // Decode response
     let mut json = match res.json::<Value>().await {
         Ok(json) => {
-            if config.log_enabled {
-                log::debug!(target: config.log_target, "#[{}] Body(Json) {}", config.request_id(), serde_json::to_string(&json).unwrap_or_default());
-            }
+            logger.log_response_json(&json);
             json
         }
         Err(e) => {
             let e = ApiError::DecodeResponse(content_type, e.to_string());
-            if config.log_enabled {
-                log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
-            }
+            logger.log_error(&e);
             return Err(e);
         }
     };
@@ -378,21 +337,17 @@ async fn parse_as_json(
 async fn parse_as_xml(
     res: Response,
     content_type: MimeType,
-    config: RequestConfig,
+    logger: Logger,
 ) -> ApiResult<ResponseBody> {
     // Decode response as text
     let text = match res.text().await {
         Ok(text) => {
-            if config.log_enabled {
-                log::debug!(target: config.log_target, "#[{}] Body(Xml) {}", config.request_id(), text);
-            }
+            logger.log_response_xml(&text);
             text
         }
         Err(e) => {
             let e = ApiError::DecodeResponse(content_type, e.to_string());
-            if config.log_enabled {
-                log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
-            }
+            logger.log_error(&e);
             return Err(e);
         }
     };
@@ -404,21 +359,17 @@ async fn parse_as_xml(
 async fn parse_as_text(
     res: Response,
     content_type: MimeType,
-    config: RequestConfig,
+    logger: Logger,
 ) -> ApiResult<ResponseBody> {
     // Decode response
     let text = match res.text().await {
         Ok(text) => {
-            if config.log_enabled {
-                log::debug!(target: config.log_target, "#[{}] Body(Text) {}", config.request_id(), text);
-            }
+            logger.log_response_text(&text);
             text
         }
         Err(e) => {
             let e = ApiError::DecodeResponse(content_type, e.to_string());
-            if config.log_enabled {
-                log::debug!(target: config.log_target, "#[{}] Error: {}", config.request_id(), e);
-            }
+            logger.log_error(&e);
             return Err(e);
         }
     };

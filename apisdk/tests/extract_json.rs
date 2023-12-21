@@ -22,7 +22,7 @@ impl JsonExtractor for HasHeaders {
         match self.0.get("code").and_then(|c| c.as_i64()) {
             Some(0) => match self.0.get_mut("data") {
                 Some(data) => serde_json::from_value(data.take()).map_err(ApiError::DecodeJson),
-                None => Err(ApiError::Other),
+                None => serde_json::from_value(Value::Null).map_err(ApiError::DecodeJson),
             },
             Some(c) => Err(ApiError::BusinessError(
                 c,
@@ -48,7 +48,7 @@ impl JsonExtractor for NoHeaders {
         assert!(self.0.get("__headers__").is_none());
         match self.0.get_mut("data") {
             Some(data) => serde_json::from_value(data.take()).map_err(ApiError::DecodeJson),
-            None => Err(ApiError::Other),
+            None => serde_json::from_value(Value::Null).map_err(ApiError::DecodeJson),
         }
     }
 }

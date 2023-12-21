@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{any::type_name, sync::Arc};
 
 use async_trait::async_trait;
 use reqwest::Request;
@@ -9,6 +9,11 @@ use crate::ResponseBody;
 /// Reply a response to request. It should be used with MockServer.
 #[async_trait]
 pub trait Responder: 'static + Send + Sync {
+    /// Get type_name, used in Debug
+    fn type_name(&self) -> &str {
+        type_name::<Self>()
+    }
+
     /// Handle the request
     /// - req: HTTP request
     async fn handle(&self, req: Request) -> anyhow::Result<ResponseBody>;
@@ -70,6 +75,10 @@ impl MockServer {
 
 #[async_trait]
 impl Responder for MockServer {
+    fn type_name(&self) -> &str {
+        self.inner.type_name()
+    }
+
     async fn handle(&self, req: Request) -> anyhow::Result<ResponseBody> {
         // Delegate to internal responder
         self.inner.handle(req).await

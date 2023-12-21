@@ -84,7 +84,10 @@ impl ResponseBody {
     {
         match self {
             Self::Json(json) => serde_json::from_value(json).map_err(ApiError::DecodeJson),
-            _ => Err(ApiError::Other),
+            _ => Err(ApiError::IncompatibleContentType(
+                MimeType::Json,
+                self.mime_type(),
+            )),
         }
     }
 
@@ -95,7 +98,14 @@ impl ResponseBody {
     {
         match self {
             Self::Xml(xml) => quick_xml::de::from_str(&xml).map_err(ApiError::DecodeXml),
-            _ => Err(ApiError::Other),
+            Self::Text(text) => {
+                log::debug!("Treat text as xml for decoding");
+                quick_xml::de::from_str(&text).map_err(ApiError::DecodeXml)
+            }
+            _ => Err(ApiError::IncompatibleContentType(
+                MimeType::Xml,
+                self.mime_type(),
+            )),
         }
     }
 }
