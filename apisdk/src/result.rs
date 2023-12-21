@@ -79,14 +79,14 @@ pub enum ApiError {
     IllegalJson(Value),
     /// Service error
     #[error("Service error: {0} - {1:?}")]
-    ServiceError(i64, Option<String>),
+    ServiceError(i32, Option<String>),
     /// Other error
     #[error("Other error: {0}")]
     Other(String),
 }
 
 impl ApiError {
-    pub fn new(code: i64, message: impl ToString) -> Self {
+    pub fn new(code: i32, message: impl ToString) -> Self {
         Self::ServiceError(code, Some(message.to_string()))
     }
 }

@@ -189,7 +189,7 @@ pub type WholePayload = Value;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CodeDataMessage<T = Option<Value>> {
     /// `code` field
-    pub code: i64,
+    pub code: i32,
     /// `data` field
     pub data: T,
     /// `message` or `msg` field

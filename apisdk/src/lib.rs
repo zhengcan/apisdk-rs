@@ -1,7 +1,7 @@
 //! A highlevel API client framework for Rust.
 
 mod core;
-mod digest;
+pub mod digest;
 mod executor;
 mod extension;
 mod extractor;
@@ -9,7 +9,6 @@ mod result;
 mod router;
 
 pub use core::*;
-pub use digest::*;
 pub use executor::*;
 pub use extension::*;
 pub use extractor::*;
