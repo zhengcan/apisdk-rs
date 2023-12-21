@@ -86,8 +86,32 @@ pub enum ApiError {
 }
 
 impl ApiError {
+    /// Build ApiError by using `code` and `message`
     pub fn new(code: i32, message: impl ToString) -> Self {
         Self::ServiceError(code, Some(message.to_string()))
+    }
+
+    /// Try to retrieve `error_code`
+    pub fn as_error_code(&self) -> i32 {
+        match self {
+            Self::Route(..)
+            | Self::InvalidUrl(..)
+            | Self::BuildRequest(..)
+            | Self::Reqwest(..)
+            | Self::Middleware(..)
+            | Self::MultipartForm => 400,
+            Self::HttpClientStatus(c, _) => *c as i32,
+            Self::HttpServerStatus(c, _) => *c as i32,
+            Self::UnsupportedContentType(..)
+            | Self::IncompatibleContentType(..)
+            | Self::DecodeResponse(..)
+            | Self::DecodeJson(..)
+            | Self::DecodeXml(..)
+            | Self::DecodeText
+            | Self::IllegalJson(..) => 500,
+            Self::ServiceError(c, _) => *c,
+            Self::Other(..) => 500,
+        }
     }
 }
 
