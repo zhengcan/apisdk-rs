@@ -65,7 +65,7 @@ async fn test_send_post_and_extract_cdm() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().build();
+    let api = TheApi::builder().with_log("error").build();
 
     let res = api.post_and_extract_cdm().await?;
     log::debug!("res = {:?}", res);

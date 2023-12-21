@@ -79,7 +79,7 @@ pub enum ApiError {
     IllegalJson(Value),
     /// Service error
     #[error("Service error: {0} - {1:?}")]
-    ServiceError(i32, Option<String>),
+    ServiceError(i64, Option<String>),
     /// Other error
     #[error("Other error: {0}")]
     Other(String),
@@ -87,7 +87,7 @@ pub enum ApiError {
 
 impl ApiError {
     /// Build ApiError by using `code` and `message`
-    pub fn new(code: i32, message: impl ToString) -> Self {
+    pub fn new(code: i64, message: impl ToString) -> Self {
         Self::ServiceError(code, Some(message.to_string()))
     }
 
@@ -109,7 +109,7 @@ impl ApiError {
             | Self::DecodeXml(..)
             | Self::DecodeText
             | Self::IllegalJson(..) => 500,
-            Self::ServiceError(c, _) => *c,
+            Self::ServiceError(c, _) => *c as i32,
             Self::Other(..) => 500,
         }
     }

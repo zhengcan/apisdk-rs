@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
+use log::LevelFilter;
 use reqwest::{header::CONTENT_TYPE, Response, ResponseBuilderExt};
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::{
-    ApiError, ApiResult, FormLike, LogConfig, Logger, MimeType, MockServer, RequestBuilder,
-    RequestId, RequestTraceIdMiddleware, Responder, ResponseBody,
+    ApiError, ApiResult, FormLike, IntoFilter, LogConfig, Logger, MimeType, MockServer,
+    RequestBuilder, RequestId, RequestTraceIdMiddleware, Responder, ResponseBody,
 };
 
 /// This struct is used to build RequestConfig internally by macros.
@@ -15,17 +16,21 @@ pub struct RequestConfigurator {
     /// The target of log
     log_target: &'static str,
     /// Indicate whether to log
-    log_enabled: Option<bool>,
+    log_filter: Option<log::LevelFilter>,
     /// Indicate whether to parse headers from response or not
     require_headers: bool,
 }
 
 impl RequestConfigurator {
     /// Create a new instance
-    pub fn new(log_target: &'static str, log_enabled: Option<bool>, require_headers: bool) -> Self {
+    pub fn new(
+        log_target: &'static str,
+        log_filter: Option<impl IntoFilter>,
+        require_headers: bool,
+    ) -> Self {
         Self {
             log_target,
-            log_enabled,
+            log_filter: log_filter.and_then(|f| f.into_filter()),
             require_headers,
         }
     }
@@ -43,21 +48,19 @@ impl RequestConfigurator {
     fn build(self, req: &mut RequestBuilder) -> (Logger, bool) {
         let extensions = req.extensions();
 
+        let log_filter = extensions
+            .get::<LogConfig>()
+            .map(|config| config.level)
+            .or_else(|| self.log_filter)
+            .unwrap_or(LevelFilter::Debug);
+
         let request_id = extensions
             .get::<RequestId>()
             .map(|id| id.request_id.clone())
             .unwrap_or_default();
 
-        let log_enabled = extensions
-            .get::<LogConfig>()
-            .map(|log_config| log_config.enabled)
-            .unwrap_or_default();
         (
-            Logger::new(
-                self.log_target,
-                self.log_enabled.unwrap_or(log_enabled),
-                request_id,
-            ),
+            Logger::new(self.log_target, log_filter, request_id),
             self.require_headers,
         )
     }
@@ -73,7 +76,7 @@ pub async fn _send(
     req = RequestTraceIdMiddleware::inject_extension(req);
 
     let (logger, require_headers) = config.build(&mut req);
-    if logger.log_enabled {
+    if logger.is_enabled() {
         req = req.with_extension(logger.clone());
     }
 
@@ -97,7 +100,7 @@ where
     req = req.json(json);
 
     let (logger, require_headers) = config.build(&mut req);
-    if logger.log_enabled {
+    if logger.is_enabled() {
         req = req.with_extension(
             logger
                 .clone()
@@ -134,7 +137,7 @@ where
     };
 
     let (logger, require_headers) = config.build(&mut req);
-    if logger.log_enabled {
+    if logger.is_enabled() {
         let logger = if is_multipart {
             logger.clone().with_multipart(meta);
         } else {
@@ -165,7 +168,7 @@ where
     req = req.multipart(form);
 
     let (logger, require_headers) = config.build(&mut req);
-    if logger.log_enabled {
+    if logger.is_enabled() {
         req = req.with_extension(logger.clone().with_multipart(meta));
     }
 
@@ -182,7 +185,7 @@ pub async fn _send_raw(
     req = RequestTraceIdMiddleware::inject_extension(req);
 
     let (logger, _) = config.build(&mut req);
-    if logger.log_enabled {
+    if logger.is_enabled() {
         req = req.with_extension(logger.clone());
     }
 

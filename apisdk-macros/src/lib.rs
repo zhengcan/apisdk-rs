@@ -86,10 +86,10 @@ pub fn api_method(
         if name_value.path.is_ident("log") {
             name_value.value
         } else {
-            syn::parse_str::<Expr>("false").unwrap()
+            syn::parse_str::<Expr>("off").unwrap()
         }
     } else {
-        syn::parse_str::<Expr>("false").unwrap()
+        syn::parse_str::<Expr>("off").unwrap()
     };
 
     let item_fn = syn::parse_macro_input!(input as ItemFn);
@@ -104,7 +104,7 @@ pub fn api_method(
         #fn_vis #fn_sig {
             #(#macros)*
 
-            Self::REQ_CONFIG.set(apisdk::internal::RequestConfigurator::new(apisdk::_function_path!(), Some(#log_enabled), false));
+            Self::REQ_CONFIG.set(apisdk::__internal::RequestConfigurator::new(apisdk::_function_path!(), Some(#log_enabled), false));
             #fn_block
         }
     };

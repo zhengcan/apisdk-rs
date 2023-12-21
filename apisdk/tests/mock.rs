@@ -47,7 +47,7 @@ async fn test_mock_single() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.touch_mock().await?;
     log::debug!("res = {:?}", res);
@@ -86,7 +86,6 @@ async fn test_mock_error() -> ApiResult<()> {
 
     let api = TheApi::builder()
         .with_initialiser(MockServer::new(|_| Err(anyhow::format_err!("any error"))))
-        .with_log(true)
         .build();
 
     let res = api.touch().await;

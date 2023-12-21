@@ -32,7 +32,7 @@ async fn test_touch_as_json() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.touch_as_json().await?;
     log::debug!("res = {:?}", res);
@@ -47,7 +47,7 @@ async fn test_touch_as_string() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.touch_as_string().await?;
     log::debug!("res = {:?}", res);
@@ -62,7 +62,7 @@ async fn test_touch_as_cdm() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.touch_as_cdm().await?;
     log::debug!("res = {:?}", res);
@@ -76,7 +76,7 @@ async fn test_touch_unit() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.touch_unit().await?;
     log::debug!("res = {:?}", res);

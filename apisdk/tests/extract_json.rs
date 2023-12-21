@@ -24,11 +24,11 @@ impl JsonExtractor for HasHeaders {
                 Some(data) => serde_json::from_value(data.take()).map_err(ApiError::DecodeJson),
                 None => serde_json::from_value(Value::Null).map_err(ApiError::DecodeJson),
             },
-            Some(c) => Err(ApiError::BusinessError(
+            Some(c) => Err(ApiError::ServiceError(
                 c,
                 Some("Invalid ret_code".to_string()),
             )),
-            None => Err(ApiError::BusinessError(-1, Some("No ret_code".to_string()))),
+            None => Err(ApiError::ServiceError(-1, Some("No ret_code".to_string()))),
         }
     }
 }
@@ -95,7 +95,7 @@ async fn test_extract_json_string() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.get_json_2_string().await?;
     log::debug!("res = {:?}", res);
@@ -109,7 +109,7 @@ async fn test_extract_json_value() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.get_json_2_value().await?;
     log::debug!("res = {:?}", res);
@@ -123,7 +123,7 @@ async fn test_extract_json_value_2_value() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.extract_value_2_value().await?;
     log::debug!("res = {:?}", res);
@@ -137,7 +137,7 @@ async fn test_extract_json_cdm_2_value() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.extract_cdm_2_value().await?;
     log::debug!("res = {:?}", res);
@@ -151,7 +151,7 @@ async fn test_extract_json_json_cdm_2_value() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.extract_json_cdm_2_value().await?;
     log::debug!("res = {:?}", res);
@@ -165,7 +165,7 @@ async fn test_extract_custom() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.extract_custom_has_headers().await?;
     log::debug!("res = {:?}", res);

@@ -79,7 +79,7 @@ async fn test_send_get_as_value() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.get_as_value().await?;
     log::debug!("res = {:?}", res);

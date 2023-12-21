@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use async_trait::async_trait;
+use log::{Level, LevelFilter};
 use reqwest::{Request, Response};
 use reqwest_middleware::{Middleware, Next, RequestBuilder, RequestInitialiser};
 use serde_json::Value;
@@ -8,22 +9,71 @@ use task_local_extensions::Extensions;
 
 use crate::ResponseBody;
 
-/// This struct is used to control how to log
-#[derive(Debug, Default, Clone)]
+/// This trait is used to create `LevelFilter`
+pub trait IntoFilter {
+    fn into_filter(self) -> Option<LevelFilter>;
+}
+
+impl IntoFilter for bool {
+    fn into_filter(self) -> Option<LevelFilter> {
+        if self {
+            Some(LevelFilter::Debug)
+        } else {
+            Some(LevelFilter::Off)
+        }
+    }
+}
+
+impl IntoFilter for &str {
+    fn into_filter(self) -> Option<LevelFilter> {
+        LevelFilter::from_str(self).ok()
+    }
+}
+
+impl IntoFilter for LevelFilter {
+    fn into_filter(self) -> Option<LevelFilter> {
+        Some(self)
+    }
+}
+
+impl IntoFilter for Level {
+    fn into_filter(self) -> Option<LevelFilter> {
+        Some(self.to_level_filter())
+    }
+}
+
+/// This struct is used to control how to log.
+/// It could be injected into request as an extension.
+#[derive(Debug, Clone)]
 pub struct LogConfig {
-    /// Enable logs
-    pub enabled: bool,
+    /// Level filter
+    pub level: LevelFilter,
+}
+
+impl Default for LogConfig {
+    fn default() -> Self {
+        Self {
+            level: LevelFilter::Debug,
+        }
+    }
 }
 
 impl LogConfig {
     /// Construct a new instance
-    pub fn new(enabled: bool) -> Self {
-        Self { enabled }
+    pub fn new<L>(level: L) -> Self
+    where
+        L: IntoFilter,
+    {
+        Self {
+            level: level.into_filter().unwrap_or(LevelFilter::Debug),
+        }
     }
 
-    /// Construct a new instance to enable all logs
-    pub fn enabled_all() -> Self {
-        Self { enabled: true }
+    /// Construct a new instance to turn off logs
+    pub fn off() -> Self {
+        Self {
+            level: LevelFilter::Off,
+        }
     }
 }
 
@@ -38,6 +88,7 @@ impl RequestInitialiser for LogConfig {
     }
 }
 
+/// This middleware is used to write logs
 pub(crate) struct LogMiddleware;
 
 #[async_trait]
@@ -60,6 +111,7 @@ impl Middleware for LogMiddleware {
     }
 }
 
+/// This enum is used to hold request payload for logging
 #[derive(Debug, Clone)]
 enum RequestPayload {
     Json(Value),
@@ -68,38 +120,47 @@ enum RequestPayload {
 }
 
 /// This struct is used to write information to log
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct Logger {
     /// The target of log
-    pub log_target: &'static str,
-    /// Indicate whether to log
-    pub log_enabled: bool,
+    log_target: &'static str,
+    /// The level of log
+    log_level: Option<Level>,
     /// The X-Request-ID value
-    pub request_id: String,
+    request_id: String,
     /// The request payload
     payload: Option<RequestPayload>,
 }
 
 impl Logger {
-    pub fn new(log_target: &'static str, log_enabled: bool, request_id: String) -> Self {
+    /// Create a new instance
+    pub fn new(log_target: &'static str, log_filter: LevelFilter, request_id: String) -> Self {
         Self {
             log_target,
-            log_enabled,
+            log_level: log_filter.to_level(),
             request_id,
             payload: None,
         }
     }
 
+    /// Check the log is enabled or not
+    pub fn is_enabled(&self) -> bool {
+        self.log_level.is_some()
+    }
+
+    /// Extends with json payload
     pub fn with_json(mut self, json: Value) -> Self {
         self.payload = Some(RequestPayload::Json(json));
         self
     }
 
+    /// Extends with form payload
     pub fn with_form(mut self, meta: HashMap<String, String>) -> Self {
         self.payload = Some(RequestPayload::Form(meta));
         self
     }
 
+    /// Extends with multipart form payload
     pub fn with_multipart(mut self, meta: HashMap<String, String>) -> Self {
         self.payload = Some(RequestPayload::Multipart(meta));
         self
@@ -107,73 +168,78 @@ impl Logger {
 }
 
 impl Logger {
+    /// Log request
     pub fn log_request(&self, req: &Request) {
-        if self.log_enabled {
-            log::debug!(target: self.log_target, "#[{}] {:?}", self.request_id, req);
+        if let Some(level) = self.log_level {
+            log::log!(target: self.log_target, level, "#[{}] {:?}", self.request_id, req);
             if let Some(payload) = self.payload.as_ref() {
-                self.log_request_payload(payload);
+                self.log_request_payload(level, payload);
             }
         }
     }
 
-    fn log_request_payload(&self, payload: &RequestPayload) {
+    fn log_request_payload(&self, level: Level, payload: &RequestPayload) {
         match payload {
             RequestPayload::Json(json) => {
-                log::debug!(target: self.log_target, "#[{}] Json\n{}", self.request_id, json);
+                log::log!(target: self.log_target, level, "#[{}] Json\n{}", self.request_id, json);
             }
             RequestPayload::Form(meta) => {
-                log::debug!(target: self.log_target, "#[{}] Form\n{:?}", self.request_id, meta);
+                log::log!(target: self.log_target, level, "#[{}] Form\n{:?}", self.request_id, meta);
             }
             RequestPayload::Multipart(meta) => {
-                log::debug!(target: self.log_target, "#[{}] Multipart\n{:?}", self.request_id, meta);
+                log::log!(target: self.log_target, level, "#[{}] Multipart\n{:?}", self.request_id, meta);
             }
         }
     }
 
+    /// Log response
     pub fn log_response(&self, res: &Response) {
-        if self.log_enabled {
-            log::debug!(target: self.log_target, "#[{}] {:?}", self.request_id, res);
+        if let Some(level) = self.log_level {
+            log::log!(target: self.log_target, level, "#[{}] {:?}", self.request_id, res);
         }
     }
 
+    /// Log response json payload
     pub fn log_response_json(&self, json: &Value) {
-        if self.log_enabled {
-            log::debug!(target: self.log_target, "#[{}] Body(Json)\n{}", self.request_id, serde_json::to_string(json).unwrap_or_default());
+        if let Some(level) = self.log_level {
+            log::log!(target: self.log_target, level, "#[{}] Body(Json)\n{}", self.request_id, serde_json::to_string(json).unwrap_or_default());
         }
     }
 
+    /// Log response xml payload
     pub fn log_response_xml(&self, xml: &str) {
-        if self.log_enabled {
-            log::debug!(target: self.log_target, "#[{}] Body(Xml)\n{}", self.request_id, &xml[0..1024.min(xml.len())]);
+        if let Some(level) = self.log_level {
+            log::log!(target: self.log_target, level, "#[{}] Body(Xml)\n{}", self.request_id, &xml[0..1024.min(xml.len())]);
         }
     }
 
+    /// Log response text payload
     pub fn log_response_text(&self, text: &str) {
-        if self.log_enabled {
-            log::debug!(target: self.log_target, "#[{}] Body(Text)\n{}", self.request_id, &text[0..1024.min(text.len())]);
+        if let Some(level) = self.log_level {
+            log::log!(target: self.log_target, level, "#[{}] Body(Text)\n{}", self.request_id, &text[0..1024.min(text.len())]);
         }
     }
 
+    /// Log mock request and response
     pub fn log_mock_request_and_response(&self, req: &Request, mock_name: &str) {
-        if self.log_enabled {
-            log::debug!(target: self.log_target, "#[{}] {:?}", self.request_id, req);
-            log::debug!(target: self.log_target, "#[{}] Response (MOCK) <= {}", self.request_id, mock_name);
+        if let Some(level) = self.log_level {
+            log::log!(target: self.log_target, level, "#[{}] {:?}", self.request_id, req);
+            log::log!(target: self.log_target, level, "#[{}] Response (MOCK) <= {}", self.request_id, mock_name);
         }
     }
 
+    /// Log mock response body
     pub fn log_mock_response_body(&self, body: &ResponseBody) {
-        if self.log_enabled {
-            match body {
-                ResponseBody::Json(json) => self.log_response_json(json),
-                ResponseBody::Xml(xml) => self.log_response_xml(xml),
-                ResponseBody::Text(text) => self.log_response_text(text),
-            }
+        match body {
+            ResponseBody::Json(json) => self.log_response_json(json),
+            ResponseBody::Xml(xml) => self.log_response_xml(xml),
+            ResponseBody::Text(text) => self.log_response_text(text),
         }
     }
 
+    /// Log error as warn or higher level
     pub fn log_error(&self, e: impl std::fmt::Display) {
-        if self.log_enabled {
-            log::debug!(target: self.log_target, "#[{}] Error: {}", self.request_id, e);
-        }
+        let level = self.log_level.unwrap_or(Level::Debug).min(Level::Warn);
+        log::log!(target: self.log_target, level, "#[{}] Error: {}", self.request_id, e);
     }
 }

@@ -7,7 +7,7 @@ pub use macros::*;
 
 /// Internal struct & functions
 #[doc(hidden)]
-pub mod internal {
+pub mod __internal {
     pub use super::execute::RequestConfigurator;
     pub use super::execute::_send;
     pub use super::execute::_send_form;

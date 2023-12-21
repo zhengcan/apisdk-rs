@@ -35,7 +35,7 @@ async fn test_extract_xml_string() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.get_xml_2_string().await?;
     log::debug!("res = {:?}", res);
@@ -49,7 +49,7 @@ async fn test_extract_xml_data() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.get_xml_2_data().await?;
     log::debug!("res = {:?}", res);

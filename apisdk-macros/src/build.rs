@@ -56,10 +56,17 @@ pub(crate) fn build_builder(
                 }
             }
 
-            /// Enable/disable log
-            #vis fn with_log(self, enabled: bool) -> Self {
+            /// Set log filter
+            #vis fn with_log<L>(self, level: L) -> Self where L: apisdk::IntoFilter {
                 Self {
-                    inner: self.inner.with_logger(apisdk::LogConfig::new(enabled))
+                    inner: self.inner.with_logger(apisdk::LogConfig::new(level))
+                }
+            }
+
+            /// Disable log
+            #vis fn disable_log(self) -> Self {
+                Self {
+                    inner: self.inner.with_logger(apisdk::LogConfig::new(apisdk::LevelFilter::Off))
                 }
             }
 
@@ -100,8 +107,8 @@ pub(crate) fn build_api_impl(
 
         impl #api_name {
             thread_local! {
-                #vis static REQ_CONFIG: std::cell::RefCell<apisdk::internal::RequestConfigurator>
-                    = std::cell::RefCell::new(apisdk::internal::RequestConfigurator::default());
+                #vis static REQ_CONFIG: std::cell::RefCell<apisdk::__internal::RequestConfigurator>
+                    = std::cell::RefCell::new(apisdk::__internal::RequestConfigurator::default());
             }
 
             /// Create an ApiBuilder

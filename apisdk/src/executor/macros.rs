@@ -77,9 +77,13 @@ macro_rules! send {
     };
     ($req:expr, ()) => {
         async {
-            let _ = $crate::internal::_send(
+            let _ = $crate::__internal::_send(
                 $req,
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
             )
             .await?;
             Ok(())
@@ -87,9 +91,13 @@ macro_rules! send {
     };
     ($req:expr, Body) => {
         async {
-            $crate::internal::_send(
+            $crate::__internal::_send(
                 $req,
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    true,
+                ),
             )
             .await
             .and_then(|c| c.try_into())
@@ -106,9 +114,13 @@ macro_rules! send {
     };
     ($req:expr, $parser:ty, ()) => {
         async {
-            let result = $crate::internal::_send(
+            let result = $crate::__internal::_send(
                 $req,
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
             )
             .await?;
             <$parser>::try_parse(result)
@@ -123,11 +135,11 @@ macro_rules! send {
     ($req:expr, $parser:ty, $vet:ty, $ve:ty) => {
         async {
             use $vet;
-            let result = $crate::internal::_send(
+            let result = $crate::__internal::_send(
                 $req,
-                $crate::internal::RequestConfigurator::new(
+                $crate::__internal::RequestConfigurator::new(
                     $crate::_function_path!(),
-                    None,
+                    None::<bool>,
                     <$ve>::require_headers(),
                 ),
             )
@@ -147,14 +159,15 @@ macro_rules! _send_with {
     };
     ($req:expr, (), $config:expr) => {
         async {
-            let _ = $crate::internal::_send($req, $config.merge($crate::_function_path!(), false))
-                .await?;
+            let _ =
+                $crate::__internal::_send($req, $config.merge($crate::_function_path!(), false))
+                    .await?;
             Ok(())
         }
     };
     ($req:expr, Body, $config:expr) => {
         async {
-            $crate::internal::_send($req, $config.merge($crate::_function_path!(), true))
+            $crate::__internal::_send($req, $config.merge($crate::_function_path!(), true))
                 .await
                 .and_then(|c| c.try_into())
         }
@@ -171,7 +184,7 @@ macro_rules! _send_with {
     ($req:expr, $parser:ty, (), $config:expr) => {
         async {
             let result =
-                $crate::internal::_send($req, $config.merge($crate::_function_path!(), false))
+                $crate::__internal::_send($req, $config.merge($crate::_function_path!(), false))
                     .await?;
             <$parser>::try_parse(result)
         }
@@ -185,7 +198,7 @@ macro_rules! _send_with {
     ($req:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
         async {
             use $vet;
-            let result = $crate::internal::_send(
+            let result = $crate::__internal::_send(
                 $req,
                 $config.merge($crate::_function_path!(), <$ve>::require_headers()),
             )
@@ -216,10 +229,14 @@ macro_rules! send_json {
     };
     ($req:expr, $json:expr, ()) => {
         async {
-            let _ = $crate::internal::_send_json(
+            let _ = $crate::__internal::_send_json(
                 $req,
                 &($json),
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
             )
             .await?;
             Ok(())
@@ -227,10 +244,14 @@ macro_rules! send_json {
     };
     ($req:expr, $json:expr, Body) => {
         async {
-            $crate::internal::_send_json(
+            $crate::__internal::_send_json(
                 $req,
                 &($json),
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    true,
+                ),
             )
             .await
             .and_then(|c| c.try_into())
@@ -247,10 +268,14 @@ macro_rules! send_json {
     };
     ($req:expr, $json:expr, $parser:ty, ()) => {
         async {
-            let result = $crate::internal::_send_json(
+            let result = $crate::__internal::_send_json(
                 $req,
                 &($json),
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
             )
             .await?;
             <$parser>::try_parse(result)
@@ -265,12 +290,12 @@ macro_rules! send_json {
     ($req:expr, $json:expr, $parser:ty, $vet:ty, $ve:ty) => {
         async {
             use $vet;
-            let result = $crate::internal::_send_json(
+            let result = $crate::__internal::_send_json(
                 $req,
                 &($json),
-                $crate::internal::RequestConfigurator::new(
+                $crate::__internal::RequestConfigurator::new(
                     $crate::_function_path!(),
-                    None,
+                    None::<bool>,
                     <$ve>::require_headers(),
                 ),
             )
@@ -290,7 +315,7 @@ macro_rules! _send_json_with {
     };
     ($req:expr, $json:expr, (), $config:expr) => {
         async {
-            let _ = $crate::internal::_send_json(
+            let _ = $crate::__internal::_send_json(
                 $req,
                 &($json),
                 $config.merge($crate::_function_path!(), false),
@@ -301,7 +326,7 @@ macro_rules! _send_json_with {
     };
     ($req:expr, $json:expr, Body, $config:expr) => {
         async {
-            $crate::internal::_send_json(
+            $crate::__internal::_send_json(
                 $req,
                 &($json),
                 $config.merge($crate::_function_path!(), true),
@@ -321,7 +346,7 @@ macro_rules! _send_json_with {
     };
     ($req:expr, $json:expr, $parser:ty, (), $config:expr) => {
         async {
-            let result = $crate::internal::_send_json(
+            let result = $crate::__internal::_send_json(
                 $req,
                 &($json),
                 $config.merge($crate::_function_path!(), false),
@@ -353,7 +378,7 @@ macro_rules! _send_json_with {
     ($req:expr, $json:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
         async {
             use $vet;
-            let result = $crate::internal::_send_json(
+            let result = $crate::__internal::_send_json(
                 $req,
                 &($json),
                 $config.merge($crate::_function_path!(), <$ve>::require_headers()),
@@ -398,10 +423,14 @@ macro_rules! send_form {
     };
     ($req:expr, $form:expr, ()) => {
         async {
-            let _ = $crate::internal::_send_form(
+            let _ = $crate::__internal::_send_form(
                 $req,
                 $form,
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
             )
             .await?;
             Ok(())
@@ -409,10 +438,14 @@ macro_rules! send_form {
     };
     ($req:expr, $form:expr, Body) => {
         async {
-            $crate::internal::_send_form(
+            $crate::__internal::_send_form(
                 $req,
                 $form,
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    true,
+                ),
             )
             .await
             .and_then(|c| c.try_into())
@@ -429,10 +462,14 @@ macro_rules! send_form {
     };
     ($req:expr, $form:expr, $parser:ty, ()) => {
         async {
-            let result = $crate::internal::_send_form(
+            let result = $crate::__internal::_send_form(
                 $req,
                 $form,
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
             )
             .await?;
             <$parser>::try_parse(result)
@@ -447,12 +484,12 @@ macro_rules! send_form {
     ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty) => {
         async {
             use $vet;
-            let result = $crate::internal::_send_form(
+            let result = $crate::__internal::_send_form(
                 $req,
                 $form,
-                $crate::internal::RequestConfigurator::new(
+                $crate::__internal::RequestConfigurator::new(
                     $crate::_function_path!(),
-                    None,
+                    None::<bool>,
                     <$ve>::require_headers(),
                 ),
             )
@@ -472,7 +509,7 @@ macro_rules! _send_form_with {
     };
     ($req:expr, $form:expr, (), $config:expr) => {
         async {
-            let _ = $crate::internal::_send_form(
+            let _ = $crate::__internal::_send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -483,7 +520,7 @@ macro_rules! _send_form_with {
     };
     ($req:expr, $form:expr, Body, $config:expr) => {
         async {
-            $crate::internal::_send_form(
+            $crate::__internal::_send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), true),
@@ -503,7 +540,7 @@ macro_rules! _send_form_with {
     };
     ($req:expr, $form:expr, $parser:ty, (), $config:expr) => {
         async {
-            let result = $crate::internal::_send_form(
+            let result = $crate::__internal::_send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -535,7 +572,7 @@ macro_rules! _send_form_with {
     ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
         async {
             use $vet;
-            let result = $crate::internal::_send_form(
+            let result = $crate::__internal::_send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), <$ve>::require_headers()),
@@ -569,10 +606,14 @@ macro_rules! send_multipart {
     };
     ($req:expr, $form:expr, ()) => {
         async {
-            let _ = $crate::internal::_send_multipart(
+            let _ = $crate::__internal::_send_multipart(
                 $req,
                 $form,
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
             )
             .await?;
             Ok(())
@@ -580,10 +621,14 @@ macro_rules! send_multipart {
     };
     ($req:expr, $form:expr, Body) => {
         async {
-            $crate::internal::_send_multipart(
+            $crate::__internal::_send_multipart(
                 $req,
                 $form,
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, true),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    true,
+                ),
             )
             .await
             .and_then(|c| c.try_into())
@@ -600,10 +645,14 @@ macro_rules! send_multipart {
     };
     ($req:expr, $form:expr, $parser:ty, ()) => {
         async {
-            let result = $crate::internal::_send_multipart(
+            let result = $crate::__internal::_send_multipart(
                 $req,
                 $form,
-                $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
             )
             .await?;
             <$parser>::try_parse(result)
@@ -618,12 +667,12 @@ macro_rules! send_multipart {
     ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty) => {
         async {
             use $vet;
-            let result = $crate::internal::_send_multipart(
+            let result = $crate::__internal::_send_multipart(
                 $req,
                 $form,
-                $crate::internal::RequestConfigurator::new(
+                $crate::__internal::RequestConfigurator::new(
                     $crate::_function_path!(),
-                    None,
+                    None::<bool>,
                     <$ve>::require_headers(),
                 ),
             )
@@ -643,7 +692,7 @@ macro_rules! _send_multipart_with {
     };
     ($req:expr, $form:expr, (), $config:expr) => {
         async {
-            let _ = $crate::internal::_send_multipart(
+            let _ = $crate::__internal::_send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -654,7 +703,7 @@ macro_rules! _send_multipart_with {
     };
     ($req:expr, $form:expr, Body, $config:expr) => {
         async {
-            $crate::internal::_send_multipart(
+            $crate::__internal::_send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), true),
@@ -674,7 +723,7 @@ macro_rules! _send_multipart_with {
     };
     ($req:expr, $form:expr, $parser:ty, (), $config:expr) => {
         async {
-            let result = $crate::internal::_send_multipart(
+            let result = $crate::__internal::_send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -706,7 +755,7 @@ macro_rules! _send_multipart_with {
     ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
         async {
             use $vet;
-            let result = $crate::internal::_send_multipart(
+            let result = $crate::__internal::_send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), <$ve>::require_headers()),
@@ -722,9 +771,13 @@ macro_rules! _send_multipart_with {
 #[macro_export]
 macro_rules! send_raw {
     ($req:expr) => {
-        $crate::internal::_send_raw(
+        $crate::__internal::_send_raw(
             $req,
-            $crate::internal::RequestConfigurator::new($crate::_function_path!(), None, false),
+            $crate::__internal::RequestConfigurator::new(
+                $crate::_function_path!(),
+                None::<bool>,
+                false,
+            ),
         )
     };
 }

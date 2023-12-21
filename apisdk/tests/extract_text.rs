@@ -16,7 +16,7 @@ async fn test_extract_text_string() -> ApiResult<()> {
     init_logger();
     start_server().await;
 
-    let api = TheApi::builder().with_log(true).build();
+    let api = TheApi::builder().build();
 
     let res = api.get_string().await?;
     log::debug!("res = {:?}", res);

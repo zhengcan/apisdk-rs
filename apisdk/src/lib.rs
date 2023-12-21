@@ -18,8 +18,7 @@ pub use router::*;
 // Re-export macros
 pub use apisdk_macros::*;
 
-// Re-export async_trait
-/// Re-export from async_trait::async_trait
+// Re-export from async_trait::async_trait
 pub use async_trait::async_trait;
 
 /// Re-export serde_json
@@ -47,3 +46,6 @@ pub use reqwest_middleware::RequestInitialiser as Initialiser;
 
 // Re-export task_local_extensions types
 pub use task_local_extensions::Extensions;
+
+/// Re-export log::LevelFilter
+pub use log::LevelFilter;
