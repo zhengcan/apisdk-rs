@@ -69,12 +69,9 @@ impl RequestConfigurator {
 /// Send request
 /// - req: used to build request
 /// - config: control the send process
-pub async fn _send(
-    mut req: RequestBuilder,
-    config: RequestConfigurator,
-) -> ApiResult<ResponseBody> {
+pub async fn send(mut req: RequestBuilder, config: RequestConfigurator) -> ApiResult<ResponseBody> {
+    // Inject extensions
     req = RequestTraceIdMiddleware::inject_extension(req);
-
     let (logger, require_headers) = config.build(&mut req);
     if logger.is_enabled() {
         req = req.with_extension(logger.clone());
@@ -87,7 +84,7 @@ pub async fn _send(
 /// - req: used to build request
 /// - json: request payload
 /// - config: control the send process
-pub async fn _send_json<I>(
+pub async fn send_json<I>(
     mut req: RequestBuilder,
     json: &I,
     config: RequestConfigurator,
@@ -95,10 +92,10 @@ pub async fn _send_json<I>(
 where
     I: Serialize + ?Sized,
 {
-    req = RequestTraceIdMiddleware::inject_extension(req);
-
     req = req.json(json);
 
+    // Inject extensions
+    req = RequestTraceIdMiddleware::inject_extension(req);
     let (logger, require_headers) = config.build(&mut req);
     if logger.is_enabled() {
         req = req.with_extension(
@@ -111,11 +108,36 @@ where
     send_and_parse(req, logger, require_headers).await
 }
 
+/// Send request with xml payload
+/// - req: used to build request
+/// - form: request payload
+/// - config: control the send process
+pub async fn send_xml<I>(
+    mut req: RequestBuilder,
+    xml: &I,
+    config: RequestConfigurator,
+) -> ApiResult<ResponseBody>
+where
+    I: Serialize + ?Sized,
+{
+    let xml = quick_xml::se::to_string(xml)?;
+    req = req.header(CONTENT_TYPE, MimeType::Xml).body(xml.clone());
+
+    // Inject extensions
+    req = RequestTraceIdMiddleware::inject_extension(req);
+    let (logger, require_headers) = config.build(&mut req);
+    if logger.is_enabled() {
+        req = req.with_extension(logger.clone().with_xml(xml));
+    }
+
+    send_and_parse(req, logger, require_headers).await
+}
+
 /// Send request with form payload
 /// - req: used to build request
 /// - form: request payload
 /// - config: control the send process
-pub async fn _send_form<I>(
+pub async fn send_form<I>(
     mut req: RequestBuilder,
     form: I,
     config: RequestConfigurator,
@@ -123,8 +145,6 @@ pub async fn _send_form<I>(
 where
     I: FormLike,
 {
-    req = RequestTraceIdMiddleware::inject_extension(req);
-
     let is_multipart = form.is_multipart();
     let meta = form.get_meta();
 
@@ -136,6 +156,8 @@ where
         req = req.form(&form);
     };
 
+    // Inject extensions
+    req = RequestTraceIdMiddleware::inject_extension(req);
     let (logger, require_headers) = config.build(&mut req);
     if logger.is_enabled() {
         let logger = if is_multipart {
@@ -153,7 +175,7 @@ where
 /// - req: used to build request
 /// - form: request payload
 /// - config: control the send process
-pub async fn _send_multipart<I>(
+pub async fn send_multipart<I>(
     mut req: RequestBuilder,
     form: I,
     config: RequestConfigurator,
@@ -161,12 +183,12 @@ pub async fn _send_multipart<I>(
 where
     I: FormLike,
 {
-    req = RequestTraceIdMiddleware::inject_extension(req);
-
     let form = form.get_multipart().ok_or(ApiError::MultipartForm)?;
     let meta = form.get_meta();
     req = req.multipart(form);
 
+    // Inject extensions
+    req = RequestTraceIdMiddleware::inject_extension(req);
     let (logger, require_headers) = config.build(&mut req);
     if logger.is_enabled() {
         req = req.with_extension(logger.clone().with_multipart(meta));
@@ -178,10 +200,7 @@ where
 /// Send request, and get raw response
 /// - req: used to build request
 /// - config: control the send process
-pub async fn _send_raw(
-    mut req: RequestBuilder,
-    config: RequestConfigurator,
-) -> ApiResult<Response> {
+pub async fn send_raw(mut req: RequestBuilder, config: RequestConfigurator) -> ApiResult<Response> {
     req = RequestTraceIdMiddleware::inject_extension(req);
 
     let (logger, _) = config.build(&mut req);

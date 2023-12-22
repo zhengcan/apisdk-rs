@@ -73,11 +73,11 @@ macro_rules! _function_path {
 #[macro_export]
 macro_rules! send {
     ($req:expr) => {
-        $crate::send!($req, $crate::Json, ())
+        $crate::send!($req, $crate::Auto, ())
     };
     ($req:expr, ()) => {
         async {
-            let _ = $crate::__internal::_send(
+            let _ = $crate::__internal::send(
                 $req,
                 $crate::__internal::RequestConfigurator::new(
                     $crate::_function_path!(),
@@ -91,7 +91,7 @@ macro_rules! send {
     };
     ($req:expr, Body) => {
         async {
-            $crate::__internal::_send(
+            $crate::__internal::send(
                 $req,
                 $crate::__internal::RequestConfigurator::new(
                     $crate::_function_path!(),
@@ -114,7 +114,7 @@ macro_rules! send {
     };
     ($req:expr, $parser:ty, ()) => {
         async {
-            let result = $crate::__internal::_send(
+            let result = $crate::__internal::send(
                 $req,
                 $crate::__internal::RequestConfigurator::new(
                     $crate::_function_path!(),
@@ -135,7 +135,7 @@ macro_rules! send {
     ($req:expr, $parser:ty, $vet:ty, $ve:ty) => {
         async {
             use $vet;
-            let result = $crate::__internal::_send(
+            let result = $crate::__internal::send(
                 $req,
                 $crate::__internal::RequestConfigurator::new(
                     $crate::_function_path!(),
@@ -155,19 +155,18 @@ macro_rules! send {
 #[doc(hidden)]
 macro_rules! _send_with {
     ($req:expr, $config:expr) => {
-        $crate::_send_with!($req, $crate::Json, (), $config)
+        $crate::_send_with!($req, $crate::Auto, (), $config)
     };
     ($req:expr, (), $config:expr) => {
         async {
-            let _ =
-                $crate::__internal::_send($req, $config.merge($crate::_function_path!(), false))
-                    .await?;
+            let _ = $crate::__internal::send($req, $config.merge($crate::_function_path!(), false))
+                .await?;
             Ok(())
         }
     };
     ($req:expr, Body, $config:expr) => {
         async {
-            $crate::__internal::_send($req, $config.merge($crate::_function_path!(), true))
+            $crate::__internal::send($req, $config.merge($crate::_function_path!(), true))
                 .await
                 .and_then(|c| c.try_into())
         }
@@ -184,7 +183,7 @@ macro_rules! _send_with {
     ($req:expr, $parser:ty, (), $config:expr) => {
         async {
             let result =
-                $crate::__internal::_send($req, $config.merge($crate::_function_path!(), false))
+                $crate::__internal::send($req, $config.merge($crate::_function_path!(), false))
                     .await?;
             <$parser>::try_parse(result)
         }
@@ -198,7 +197,7 @@ macro_rules! _send_with {
     ($req:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
         async {
             use $vet;
-            let result = $crate::__internal::_send(
+            let result = $crate::__internal::send(
                 $req,
                 $config.merge($crate::_function_path!(), <$ve>::require_headers()),
             )
@@ -225,11 +224,11 @@ macro_rules! _send_with {
 #[macro_export]
 macro_rules! send_json {
     ($req:expr, $json:expr) => {
-        $crate::send_json!($req, $json, $crate::Json, ())
+        $crate::send_json!($req, $json, $crate::Auto, ())
     };
     ($req:expr, $json:expr, ()) => {
         async {
-            let _ = $crate::__internal::_send_json(
+            let _ = $crate::__internal::send_json(
                 $req,
                 &($json),
                 $crate::__internal::RequestConfigurator::new(
@@ -244,7 +243,7 @@ macro_rules! send_json {
     };
     ($req:expr, $json:expr, Body) => {
         async {
-            $crate::__internal::_send_json(
+            $crate::__internal::send_json(
                 $req,
                 &($json),
                 $crate::__internal::RequestConfigurator::new(
@@ -268,7 +267,7 @@ macro_rules! send_json {
     };
     ($req:expr, $json:expr, $parser:ty, ()) => {
         async {
-            let result = $crate::__internal::_send_json(
+            let result = $crate::__internal::send_json(
                 $req,
                 &($json),
                 $crate::__internal::RequestConfigurator::new(
@@ -290,7 +289,7 @@ macro_rules! send_json {
     ($req:expr, $json:expr, $parser:ty, $vet:ty, $ve:ty) => {
         async {
             use $vet;
-            let result = $crate::__internal::_send_json(
+            let result = $crate::__internal::send_json(
                 $req,
                 &($json),
                 $crate::__internal::RequestConfigurator::new(
@@ -311,11 +310,11 @@ macro_rules! send_json {
 #[doc(hidden)]
 macro_rules! _send_json_with {
     ($req:expr, $json:expr, $config:expr) => {
-        $crate::_send_json_with!($req, $json, $crate::Json, (), $config)
+        $crate::_send_json_with!($req, $json, $crate::Auto, (), $config)
     };
     ($req:expr, $json:expr, (), $config:expr) => {
         async {
-            let _ = $crate::__internal::_send_json(
+            let _ = $crate::__internal::send_json(
                 $req,
                 &($json),
                 $config.merge($crate::_function_path!(), false),
@@ -326,7 +325,7 @@ macro_rules! _send_json_with {
     };
     ($req:expr, $json:expr, Body, $config:expr) => {
         async {
-            $crate::__internal::_send_json(
+            $crate::__internal::send_json(
                 $req,
                 &($json),
                 $config.merge($crate::_function_path!(), true),
@@ -346,7 +345,7 @@ macro_rules! _send_json_with {
     };
     ($req:expr, $json:expr, $parser:ty, (), $config:expr) => {
         async {
-            let result = $crate::__internal::_send_json(
+            let result = $crate::__internal::send_json(
                 $req,
                 &($json),
                 $config.merge($crate::_function_path!(), false),
@@ -378,9 +377,193 @@ macro_rules! _send_json_with {
     ($req:expr, $json:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
         async {
             use $vet;
-            let result = $crate::__internal::_send_json(
+            let result = $crate::__internal::send_json(
                 $req,
                 &($json),
+                $config.merge($crate::_function_path!(), <$ve>::require_headers()),
+            )
+            .await?;
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
+        }
+    };
+}
+
+/// Send the payload as XML, which will be serialized by quick_xml
+///
+/// # Examples
+///
+/// ```
+/// #[derive(serde::Serialize)]
+/// struct Data {
+///     key: String,
+/// }
+///
+/// let data = Data { key: "value".to_string() };
+/// let req = client.post("/path/api").await?;
+/// let res: TypeOfResponse = send_xml!(req, data).await?;
+/// ```
+///
+/// Please reference `send` for more information
+#[macro_export]
+macro_rules! send_xml {
+    ($req:expr, $xml:expr) => {
+        $crate::send_xml!($req, $xml, $crate::Auto, ())
+    };
+    ($req:expr, $xml:expr, ()) => {
+        async {
+            let _ = $crate::__internal::send_xml(
+                $req,
+                &($xml),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
+            )
+            .await?;
+            Ok(())
+        }
+    };
+    ($req:expr, $xml:expr, Body) => {
+        async {
+            $crate::__internal::send_xml(
+                $req,
+                &($xml),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    true,
+                ),
+            )
+            .await
+            .and_then(|c| c.try_into())
+        }
+    };
+    ($req:expr, $xml:expr, Json) => {
+        $crate::send_xml!($req, $xml, $crate::Json, ())
+    };
+    ($req:expr, $xml:expr, Xml) => {
+        $crate::send_xml!($req, $xml, $crate::Xml, ())
+    };
+    ($req:expr, $xml:expr, Text) => {
+        $crate::send_xml!($req, $xml, $crate::Text, ())
+    };
+    ($req:expr, $xml:expr, $parser:ty, ()) => {
+        async {
+            let result = $crate::__internal::send_xml(
+                $req,
+                &($xml),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    false,
+                ),
+            )
+            .await?;
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, $xml:expr, Json<$ve:ty>) => {
+        $crate::send_xml!($req, $xml, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $xml:expr, $ve:ty) => {
+        $crate::send_xml!($req, $xml, $crate::Json, $crate::JsonExtractor, $ve)
+    };
+    ($req:expr, $xml:expr, $parser:ty, $vet:ty, $ve:ty) => {
+        async {
+            use $vet;
+            let result = $crate::__internal::send_xml(
+                $req,
+                &($xml),
+                $crate::__internal::RequestConfigurator::new(
+                    $crate::_function_path!(),
+                    None::<bool>,
+                    <$ve>::require_headers(),
+                ),
+            )
+            .await?;
+            let result = <$parser>::try_parse::<$ve>(result)?;
+            <$ve>::try_extract(result)
+        }
+    };
+}
+
+/// Internal macro
+#[macro_export]
+#[doc(hidden)]
+macro_rules! _send_xml_with {
+    ($req:expr, $xml:expr, $config:expr) => {
+        $crate::_send_xml_with!($req, $xml, $crate::Auto, (), $config)
+    };
+    ($req:expr, $xml:expr, (), $config:expr) => {
+        async {
+            let _ = $crate::__internal::send_xml(
+                $req,
+                &($xml),
+                $config.merge($crate::_function_path!(), false),
+            )
+            .await?;
+            Ok(())
+        }
+    };
+    ($req:expr, $xml:expr, Body, $config:expr) => {
+        async {
+            $crate::__internal::send_xml(
+                $req,
+                &($xml),
+                $config.merge($crate::_function_path!(), true),
+            )
+            .await
+            .and_then(|c| c.try_into())
+        }
+    };
+    ($req:expr, $xml:expr, Json, $config:expr) => {
+        $crate::_send_xml_with!($req, $xml, $crate::Json, (), $config)
+    };
+    ($req:expr, $xml:expr, Xml, $config:expr) => {
+        $crate::_send_xml_with!($req, $xml, $crate::Xml, (), $config)
+    };
+    ($req:expr, $xml:expr, Text, $config:expr) => {
+        $crate::_send_xml_with!($req, $xml, $crate::Text, (), $config)
+    };
+    ($req:expr, $xml:expr, $parser:ty, (), $config:expr) => {
+        async {
+            let result = $crate::__internal::send_xml(
+                $req,
+                &($xml),
+                $config.merge($crate::_function_path!(), false),
+            )
+            .await?;
+            <$parser>::try_parse(result)
+        }
+    };
+    ($req:expr, $xml:expr, Json<$ve:ty>, $config:expr) => {
+        $crate::_send_xml_with!(
+            $req,
+            $xml,
+            $crate::Json,
+            $crate::JsonExtractor,
+            $ve,
+            $config
+        )
+    };
+    ($req:expr, $xml:expr, $ve:ty, $config:expr) => {
+        $crate::_send_xml_with!(
+            $req,
+            $xml,
+            $crate::Json,
+            $crate::JsonExtractor,
+            $ve,
+            $config
+        )
+    };
+    ($req:expr, $xml:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
+        async {
+            use $vet;
+            let result = $crate::__internal::send_xml(
+                $req,
+                &($xml),
                 $config.merge($crate::_function_path!(), <$ve>::require_headers()),
             )
             .await?;
@@ -419,11 +602,11 @@ macro_rules! _send_json_with {
 #[macro_export]
 macro_rules! send_form {
     ($req:expr, $form:expr) => {
-        $crate::send_form!($req, $form, $crate::Json, ())
+        $crate::send_form!($req, $form, $crate::Auto, ())
     };
     ($req:expr, $form:expr, ()) => {
         async {
-            let _ = $crate::__internal::_send_form(
+            let _ = $crate::__internal::send_form(
                 $req,
                 $form,
                 $crate::__internal::RequestConfigurator::new(
@@ -438,7 +621,7 @@ macro_rules! send_form {
     };
     ($req:expr, $form:expr, Body) => {
         async {
-            $crate::__internal::_send_form(
+            $crate::__internal::send_form(
                 $req,
                 $form,
                 $crate::__internal::RequestConfigurator::new(
@@ -462,7 +645,7 @@ macro_rules! send_form {
     };
     ($req:expr, $form:expr, $parser:ty, ()) => {
         async {
-            let result = $crate::__internal::_send_form(
+            let result = $crate::__internal::send_form(
                 $req,
                 $form,
                 $crate::__internal::RequestConfigurator::new(
@@ -484,7 +667,7 @@ macro_rules! send_form {
     ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty) => {
         async {
             use $vet;
-            let result = $crate::__internal::_send_form(
+            let result = $crate::__internal::send_form(
                 $req,
                 $form,
                 $crate::__internal::RequestConfigurator::new(
@@ -505,11 +688,11 @@ macro_rules! send_form {
 #[doc(hidden)]
 macro_rules! _send_form_with {
     ($req:expr, $form:expr, $config:expr) => {
-        $crate::_send_form_with!($req, $form, $crate::Json, (), $config)
+        $crate::_send_form_with!($req, $form, $crate::Auto, (), $config)
     };
     ($req:expr, $form:expr, (), $config:expr) => {
         async {
-            let _ = $crate::__internal::_send_form(
+            let _ = $crate::__internal::send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -520,7 +703,7 @@ macro_rules! _send_form_with {
     };
     ($req:expr, $form:expr, Body, $config:expr) => {
         async {
-            $crate::__internal::_send_form(
+            $crate::__internal::send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), true),
@@ -540,7 +723,7 @@ macro_rules! _send_form_with {
     };
     ($req:expr, $form:expr, $parser:ty, (), $config:expr) => {
         async {
-            let result = $crate::__internal::_send_form(
+            let result = $crate::__internal::send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -572,7 +755,7 @@ macro_rules! _send_form_with {
     ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
         async {
             use $vet;
-            let result = $crate::__internal::_send_form(
+            let result = $crate::__internal::send_form(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), <$ve>::require_headers()),
@@ -602,11 +785,11 @@ macro_rules! _send_form_with {
 #[macro_export]
 macro_rules! send_multipart {
     ($req:expr, $form:expr) => {
-        $crate::send_multipart!($req, $form, $crate::Json, ())
+        $crate::send_multipart!($req, $form, $crate::Auto, ())
     };
     ($req:expr, $form:expr, ()) => {
         async {
-            let _ = $crate::__internal::_send_multipart(
+            let _ = $crate::__internal::send_multipart(
                 $req,
                 $form,
                 $crate::__internal::RequestConfigurator::new(
@@ -621,7 +804,7 @@ macro_rules! send_multipart {
     };
     ($req:expr, $form:expr, Body) => {
         async {
-            $crate::__internal::_send_multipart(
+            $crate::__internal::send_multipart(
                 $req,
                 $form,
                 $crate::__internal::RequestConfigurator::new(
@@ -645,7 +828,7 @@ macro_rules! send_multipart {
     };
     ($req:expr, $form:expr, $parser:ty, ()) => {
         async {
-            let result = $crate::__internal::_send_multipart(
+            let result = $crate::__internal::send_multipart(
                 $req,
                 $form,
                 $crate::__internal::RequestConfigurator::new(
@@ -667,7 +850,7 @@ macro_rules! send_multipart {
     ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty) => {
         async {
             use $vet;
-            let result = $crate::__internal::_send_multipart(
+            let result = $crate::__internal::send_multipart(
                 $req,
                 $form,
                 $crate::__internal::RequestConfigurator::new(
@@ -688,11 +871,11 @@ macro_rules! send_multipart {
 #[doc(hidden)]
 macro_rules! _send_multipart_with {
     ($req:expr, $form:expr, $config:expr) => {
-        $crate::_send_multipart_with!($req, $form, $crate::Json, (), $config)
+        $crate::_send_multipart_with!($req, $form, $crate::Auto, (), $config)
     };
     ($req:expr, $form:expr, (), $config:expr) => {
         async {
-            let _ = $crate::__internal::_send_multipart(
+            let _ = $crate::__internal::send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -703,7 +886,7 @@ macro_rules! _send_multipart_with {
     };
     ($req:expr, $form:expr, Body, $config:expr) => {
         async {
-            $crate::__internal::_send_multipart(
+            $crate::__internal::send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), true),
@@ -723,7 +906,7 @@ macro_rules! _send_multipart_with {
     };
     ($req:expr, $form:expr, $parser:ty, (), $config:expr) => {
         async {
-            let result = $crate::__internal::_send_multipart(
+            let result = $crate::__internal::send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), false),
@@ -755,7 +938,7 @@ macro_rules! _send_multipart_with {
     ($req:expr, $form:expr, $parser:ty, $vet:ty, $ve:ty, $config:expr) => {
         async {
             use $vet;
-            let result = $crate::__internal::_send_multipart(
+            let result = $crate::__internal::send_multipart(
                 $req,
                 $form,
                 $config.merge($crate::_function_path!(), <$ve>::require_headers()),
@@ -771,7 +954,7 @@ macro_rules! _send_multipart_with {
 #[macro_export]
 macro_rules! send_raw {
     ($req:expr) => {
-        $crate::__internal::_send_raw(
+        $crate::__internal::send_raw(
             $req,
             $crate::__internal::RequestConfigurator::new(
                 $crate::_function_path!(),

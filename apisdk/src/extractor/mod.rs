@@ -1,10 +1,13 @@
+use hyper::header::HeaderValue;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+mod auto;
 mod json;
 mod text;
 mod xml;
 
+pub use auto::*;
 pub use json::*;
 pub use text::*;
 pub use xml::*;
@@ -53,6 +56,13 @@ impl From<&str> for MimeType {
         } else {
             Self::Other(value)
         }
+    }
+}
+
+impl From<MimeType> for HeaderValue {
+    fn from(value: MimeType) -> Self {
+        HeaderValue::from_str(value.to_string().as_str())
+            .unwrap_or(HeaderValue::from_static("text/plain"))
     }
 }
 

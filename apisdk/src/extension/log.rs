@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, time::Instant};
 
 use async_trait::async_trait;
 use log::{Level, LevelFilter};
@@ -115,6 +115,7 @@ impl Middleware for LogMiddleware {
 #[derive(Debug, Clone)]
 enum RequestPayload {
     Json(Value),
+    Xml(String),
     Form(HashMap<String, String>),
     Multipart(HashMap<String, String>),
 }
@@ -128,6 +129,8 @@ pub(crate) struct Logger {
     log_level: Option<Level>,
     /// The X-Request-ID value
     request_id: String,
+    /// The start instant
+    start: Instant,
     /// The request payload
     payload: Option<RequestPayload>,
 }
@@ -139,6 +142,7 @@ impl Logger {
             log_target,
             log_level: log_filter.to_level(),
             request_id,
+            start: Instant::now(),
             payload: None,
         }
     }
@@ -151,6 +155,12 @@ impl Logger {
     /// Extends with json payload
     pub fn with_json(mut self, json: Value) -> Self {
         self.payload = Some(RequestPayload::Json(json));
+        self
+    }
+
+    /// Extends with xml payload
+    pub fn with_xml(mut self, xml: String) -> Self {
+        self.payload = Some(RequestPayload::Xml(xml));
         self
     }
 
@@ -183,6 +193,9 @@ impl Logger {
             RequestPayload::Json(json) => {
                 log::log!(target: self.log_target, level, "#[{}] Request Json\n{}", self.request_id, json);
             }
+            RequestPayload::Xml(xml) => {
+                log::log!(target: self.log_target, level, "#[{}] Request Xml\n{:?}", self.request_id, xml);
+            }
             RequestPayload::Form(meta) => {
                 log::log!(target: self.log_target, level, "#[{}] Request Form\n{:?}", self.request_id, meta);
             }
@@ -195,28 +208,56 @@ impl Logger {
     /// Log response
     pub fn log_response(&self, res: &Response) {
         if let Some(level) = self.log_level {
-            log::log!(target: self.log_target, level, "#[{}] {:?}", self.request_id, res);
+            log::log!(
+                target: self.log_target,
+                level,
+                "#[{}] {:?} @{}ms",
+                self.request_id,
+                res,
+                self.start.elapsed().as_millis()
+            );
         }
     }
 
     /// Log response json payload
     pub fn log_response_json(&self, json: &Value) {
         if let Some(level) = self.log_level {
-            log::log!(target: self.log_target, level, "#[{}] Response Body(Json)\n{}", self.request_id, serde_json::to_string(json).unwrap_or_default());
+            log::log!(
+                target: self.log_target,
+                level,
+                "#[{}] Response Body(Json) @{}ms\n{}",
+                self.request_id,
+                self.start.elapsed().as_millis(),
+                serde_json::to_string(json).unwrap_or_default()
+            );
         }
     }
 
     /// Log response xml payload
     pub fn log_response_xml(&self, xml: &str) {
         if let Some(level) = self.log_level {
-            log::log!(target: self.log_target, level, "#[{}] Response Body(Xml)\n{}", self.request_id, &xml[0..1024.min(xml.len())]);
+            log::log!(
+                target: self.log_target,
+                level,
+                "#[{}] Response Body(Xml) @{}ms\n{}",
+                self.request_id,
+                self.start.elapsed().as_millis(),
+                &xml[0..1024.min(xml.len())]
+            );
         }
     }
 
     /// Log response text payload
     pub fn log_response_text(&self, text: &str) {
         if let Some(level) = self.log_level {
-            log::log!(target: self.log_target, level, "#[{}] Response Body(Text)\n{}", self.request_id, &text[0..1024.min(text.len())]);
+            log::log!(
+                target: self.log_target,
+                level,
+                "#[{}] Response Body(Text) @{}ms\n{}",
+                self.request_id,
+                self.start.elapsed().as_millis(),
+                &text[0..1024.min(text.len())]
+            );
         }
     }
 
@@ -240,6 +281,13 @@ impl Logger {
     /// Log error as warn or higher level
     pub fn log_error(&self, e: impl std::fmt::Display) {
         let level = self.log_level.unwrap_or(Level::Debug).min(Level::Warn);
-        log::log!(target: self.log_target, level, "#[{}] Error: {}", self.request_id, e);
+        log::log!(
+            target: self.log_target,
+            level,
+            "#[{}] Error @{}ms: {}",
+            self.request_id,
+            self.start.elapsed().as_millis(),
+            e
+        );
     }
 }
