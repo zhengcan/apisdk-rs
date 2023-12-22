@@ -164,6 +164,7 @@ impl std::fmt::Debug for ApiCore {
 }
 
 impl ApiCore {
+    /// Create a new ApiCore with a different base_url
     pub fn rebase(&self, base_url: impl IntoUrl) -> ApiResult<Self> {
         Ok(Self {
             client: self.client.clone(),

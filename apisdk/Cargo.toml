@@ -14,7 +14,7 @@ readme = "../README.md"
 doctest = false
 
 [dependencies]
-apisdk-macros = { path = "../apisdk-macros" }
+apisdk-macros = "0.0.4-beta.8"
 async-trait = "0.1"
 http = "1.0"
 url = "2.5"

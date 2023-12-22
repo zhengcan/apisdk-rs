@@ -4,7 +4,7 @@ A highlevel API client framework for Rust.
 
 - Built on top of [reqwest](https://github.com/seanmonstar/reqwest/) to handle HTTP requests
 - Macros to define API and send requests
-- Send request as JSON / form / multipart
+- Send request as JSON / XML / form / multipart
 - Parse response by [serde](https://serde.rs/)
     - Use [serde_json](https://github.com/serde-rs/json) to process JSON response
     - Use [quick-xml](https://github.com/tafia/quick-xml) to process XML response
@@ -22,7 +22,7 @@ When using [reqwest](https://github.com/seanmonstar/reqwest/) to send API reques
 
 For this reason, we often develop some auxiliary functions to achieve the above functions. The design purpose of this crate is to simplify this part of the development work and provide a common design implementation.
 
-# Get Start
+# Getting Started
 
 To define a very simple API, we just need a few lines of code.
 
@@ -77,10 +77,12 @@ async fn foo() -> ApiResult<()> {
 - `api_method`
     - (optional) refine an API method
 
-### customize API instance
+### create API instance
 
 We can use `XxxApi::builder()` to get an instance of `ApiBuilder`, and call following functions to customize API instance. 
 
+- `with_client`
+    - set `reqwest::ClientBuilder` to customize Client
 - `with_router`
     - rewrite host and port
 - `with_signature`
@@ -90,9 +92,13 @@ We can use `XxxApi::builder()` to get an instance of `ApiBuilder`, and call foll
 - `with_log`
     - enable/disable logs in processing requests
 
+After that, we should call `build()` to create the API instance.
+
+For really simple APIs, we can use `XxxApi::default()` to replace `XxxApi::builder().build()`.
+
 ### create HTTP request
 
-The `http_api` defines several functions for `XxxApi` to create HTTP request. 
+Within the API instance, there are several functions thats help create HTTP requests. 
 
 - create with HTTP method
     - `async fn request(method: Method, path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
@@ -105,6 +111,15 @@ The `http_api` defines several functions for `XxxApi` to create HTTP request.
     - `async fn delete(path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
     - `async fn options(path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
     - `async fn trace(path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
+
+We can also access the `core` field of the API instance to access more low-level functionality.
+
+```rust
+let api = XxxApi::default();
+let req = api.core  // an instance of apisdk::ApiCore
+    .rebase("http://different.host.com/api")
+    .build_request(Method::GET, "/path")?;
+```
 
 ### extends `RequestBuilder`
 
@@ -123,31 +138,36 @@ This crate re-export `RequestBuilder` from `reqwest-middleware`, and provides se
     - send request, and not detect or process the payload
 - `send_json`
     - send request with JSON payload
+- `send_xml`
+    - send request with XML payload
 - `send_form`
     - send request with urlencoded form or multipart form
 - `send_multipart`
     - send request with multipart form
 
-```
+```rust
 // Form 1: send and parse JSON response to Data
-let _: Data = send!(req).await;
+let _: Data = send!(req).await?;
 
-// Form 2: send and parse JSON response to Data
-let _ = send!(req, Data).await;
+// Form 2: send, drop response and return ApiResult<()>
+send!(req, ()).await?;
 
-// Form 3: send and parse JSON response to Data
-let _: Data = send!(req, Json).await;
+// Form 3: send and return ResponseBody
+let _ = send!(req, Body).await?;
 
-// Form 4: send and parse XML response to Data
-let _: Data = send!(req, Xml).await;
+// Form 4: send and parse JSON response to Data
+let _: Data = send!(req, Json).await?;
 
-// Form 5: send and parse Text response to Data by using FromStr trait
-let _: Data = send!(req, Text).await;
+// Form 5: send and parse XML response to Data
+let _: Data = send!(req, Xml).await?;
 
-// Form 6: send and parse JSON response to Data
-let _ = send!(req, Json<Data>).await;
+// Form 6: send and parse Text response to Data by using FromStr trait
+let _: Data = send!(req, Text).await?;
 
-// Form 7: send, drop response and return ApiResult<()>
-send!(req, ()).await;
+// Form 7: send and parse JSON response to Data
+let _ = send!(req, Data).await?;
+
+// Form 8: send and parse JSON response to Data
+let _ = send!(req, Json<Data>).await?;
 ```
 

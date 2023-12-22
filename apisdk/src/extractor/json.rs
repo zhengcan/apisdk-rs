@@ -78,8 +78,10 @@ impl Json {
 /// }
 /// ```
 ///
-/// # Built-in Extractors
+/// # Built-in JsonExtractors
 ///
+/// - std::string::String
+///     - treat whole payload as text output
 /// - serde_json::Value
 ///     - treat whole payload as json output
 /// - apisdk::WholePayload

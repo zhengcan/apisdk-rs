@@ -15,9 +15,37 @@ macro_rules! _function_path {
 
 /// Send request
 ///
-/// # Examples
+/// # Forms
 ///
-/// ### Option 1: Convert whole response to struct
+/// - `send!(req)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, and parse response as json or xml based on response
+/// - `send!(req, ())` -> `impl Future<Output = ApiResult<()>>`
+///     - send the request, verify response status, then discard response
+/// - `send!(req, Body)` -> `impl Future<Output = ApiResult<apisdk::ResponseBody>>`
+///     - send the request, verify response status, and decode response body
+/// - `send!(req, Json)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as json, then use serde_json to deserialize it
+/// - `send!(req, Xml)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as xml, then use quick_xml to deserialize it
+/// - `send!(req, Text)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as text, then use FromStr to deserialize it
+/// - `send!(req, OtherType)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as json, and use `OtherType` as JsonExtractor
+/// - `send!(req, Json<OtherType>)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as json, and use `OtherType` as JsonExtractor
+///
+/// ### Built-in JsonExtractors
+///
+/// - std::string::String
+///     - treat whole payload as text output
+/// - serde_json::Value
+///     - treat whole payload as json output
+/// - apisdk::WholePayload
+///     - an alias of serde_json::Value
+/// - apisdk::CodeDataMessage
+///     - parse `{code, data, message}` json payload, verify `code`, and return `data` field
+///
+/// # Examples
 ///
 /// ```
 /// use serde::Deserialize;
@@ -28,48 +56,6 @@ macro_rules! _function_path {
 /// let req = self.get("/path/api").await?;
 /// let res: TypeOfResponse = send!(req).await?;
 /// ```
-///
-/// ### Option 2: Use a `Extractor` to get some fields from response
-///
-/// ```
-/// use apisdk::{ApiError, ApiResult, Content, Extractor};
-/// use serde::{Deserialize, DeserializeOwned};
-///
-/// struct MyExtractor {}
-/// impl Extractor for MyExtractor {
-///     fn try_extract<T>(content: Content) -> ApiResult<T>
-///     where
-///         T: DeserializeOwned,
-///     {
-///         match content {
-///             Content::Json(mut value) => {
-///                 match value.get("data") {
-///                     Some(data) => serde_json::from_value(data.take()).map_err(|e| e.into()),
-///                     None => Err(ApiError::InvalidJson(value)),
-///                 }
-///             }
-///             Content::Text(text) => Err(ApiError::DecodeResponse("text/plain".to_string(), text)),
-///         }
-///     }
-/// }
-///
-/// #[derive(Deserialize)]
-/// struct TypeOfData {}
-///
-/// let req = client.get("/path/api").await?;
-/// let res: TypeOfData = send!(req, MyExtractor).await?;
-/// ```
-///
-/// # Extractor
-///
-/// `Extractor` is used to build result from response.
-///
-/// We provides two built-in implementations:
-/// - `WholePayload`
-///     - return whole payload of response
-/// - `CodeDataMessage`
-///     - parse the payload of response as `{ code: i64, data: T, message: Option<String> }`
-///     - ensure `code` is `0` and return `data` field
 #[macro_export]
 macro_rules! send {
     ($req:expr) => {
@@ -209,6 +195,25 @@ macro_rules! _send_with {
 }
 
 /// Send the payload as JSON
+///
+/// # Forms
+///
+/// - `send_json!(req, json)` -> `impl Future<Output = ApiResult<T>>`
+///     - send json, and parse response as json or xml based on response
+/// - `send_json!(req, json, ())` -> `impl Future<Output = ApiResult<()>>`
+///     - send json, verify response status, then discard response
+/// - `send_json!(req, json, Body)` -> `impl Future<Output = ApiResult<apisdk::ResponseBody>>`
+///     - send json, verify response status, and decode response body
+/// - `send_json!(req, json, Json)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as json, then use serde_json to deserialize it
+/// - `send_json!(req, json, Xml)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as xml, then use quick_xml to deserialize it
+/// - `send_json!(req, json, Text)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as text, then use FromStr to deserialize it
+/// - `send_json!(req, json, OtherType)` -> `impl Future<Output = ApiResult<T>>`
+///     - send json, parse response as json, and use `OtherType` as JsonExtractor
+/// - `send_json!(req, json, Json<OtherType>)` -> `impl Future<Output = ApiResult<T>>`
+///     - send json, parse response as json, and use `OtherType` as JsonExtractor
 ///
 /// # Examples
 ///
@@ -390,6 +395,25 @@ macro_rules! _send_json_with {
 }
 
 /// Send the payload as XML, which will be serialized by quick_xml
+///
+/// # Forms
+///
+/// - `send_xml!(req, xml)` -> `impl Future<Output = ApiResult<T>>`
+///     - send xml, and parse response as json or xml based on response
+/// - `send_xml!(req, xml, ())` -> `impl Future<Output = ApiResult<()>>`
+///     - send xml, verify response status, then discard response
+/// - `send_xml!(req, xml, Body)` -> `impl Future<Output = ApiResult<apisdk::ResponseBody>>`
+///     - send xml, verify response status, and decode response body
+/// - `send_xml!(req, xml, Json)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as json, then use serde_json to deserialize it
+/// - `send_xml!(req, xml, Xml)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as xml, then use quick_xml to deserialize it
+/// - `send_xml!(req, xml, Text)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as text, then use FromStr to deserialize it
+/// - `send_xml!(req, xml, OtherType)` -> `impl Future<Output = ApiResult<T>>`
+///     - send xml, parse response as json, and use `OtherType` as JsonExtractor
+/// - `send_xml!(req, xml, Json<OtherType>)` -> `impl Future<Output = ApiResult<T>>`
+///     - send xml, parse response as json, and use `OtherType` as JsonExtractor
 ///
 /// # Examples
 ///
@@ -574,6 +598,25 @@ macro_rules! _send_xml_with {
 }
 
 /// Send the payload as form
+///
+/// # Forms
+///
+/// - `send_form!(req, form)` -> `impl Future<Output = ApiResult<T>>`
+///     - send form, and parse response as json or xml based on response
+/// - `send_form!(req, form, ())` -> `impl Future<Output = ApiResult<()>>`
+///     - send form, verify response status, then discard response
+/// - `send_form!(req, form, Body)` -> `impl Future<Output = ApiResult<apisdk::ResponseBody>>`
+///     - send form, verify response status, and decode response body
+/// - `send_form!(req, form, Json)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as json, then use serde_json to deserialize it
+/// - `send_form!(req, form, Xml)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as xml, then use quick_xml to deserialize it
+/// - `send_form!(req, form, Text)`-> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as text, then use FromStr to deserialize it
+/// - `send_form!(req, form, OtherType)` -> `impl Future<Output = ApiResult<T>>`
+///     - send form, parse response as json, and use `OtherType` as JsonExtractor
+/// - `send_form!(req, form, Json<OtherType>)` -> `impl Future<Output = ApiResult<T>>`
+///     - send form, parse response as json, and use `OtherType` as JsonExtractor
 ///
 /// # Examples
 ///
@@ -769,6 +812,27 @@ macro_rules! _send_form_with {
 
 /// Send the payload as multipart form
 ///
+/// # Forms
+///
+/// - `send_multipart!(req, form)` -> `impl Future<Output = ApiResult<T>>`
+///     - send form, and parse response as json or xml based on response
+/// - `send_multipart!(req, form, ())` -> `impl Future<Output = ApiResult<()>>`
+///     - send form, verify response status, then discard response
+/// - `send_multipart!(req, form, Body)` -> `impl Future<Output = ApiResult<apisdk::ResponseBody>>`
+///     - send form, verify response status, and decode response body
+/// - `send_multipart!(req, form, Json)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as json, then use serde_json to deserialize it
+/// - `send_multipart!(req, form, Xml)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as xml, then use quick_xml to deserialize it
+/// - `send_multipart!(req, form, Text)` -> `impl Future<Output = ApiResult<T>>`
+///     - send the request, parse response as text, then use FromStr to deserialize it
+/// - `send_multipart!(req, form, OtherType)` -> `impl Future<Output = ApiResult<T>>`
+///     - send form, parse response as json, and use `OtherType` as JsonExtractor
+/// - `send_multipart!(req, form, Json<OtherType>)` -> `impl Future<Output = ApiResult<T>>`
+///     - send form, parse response as json, and use `OtherType` as JsonExtractor
+///
+/// # Examples
+///
 /// ### Use MultipartForm to build form
 ///
 /// ```
@@ -951,6 +1015,11 @@ macro_rules! _send_multipart_with {
 }
 
 /// Send and get raw response
+///
+/// # Forms
+///
+/// - `send_raw!(req)`
+///     - send request, and return raw response
 #[macro_export]
 macro_rules! send_raw {
     ($req:expr) => {
