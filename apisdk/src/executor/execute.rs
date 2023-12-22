@@ -139,9 +139,9 @@ where
     let (logger, require_headers) = config.build(&mut req);
     if logger.is_enabled() {
         let logger = if is_multipart {
-            logger.clone().with_multipart(meta);
+            logger.clone().with_multipart(meta)
         } else {
-            logger.clone().with_form(meta);
+            logger.clone().with_form(meta)
         };
         req = req.with_extension(logger);
     }
