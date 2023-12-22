@@ -1,3 +1,0 @@
-pre-release-replacements = [
-  {file="Cargo.toml", search="apisdk-macros.*", replace="apisdk-macros = \"{{version}}\""} ,
-]
