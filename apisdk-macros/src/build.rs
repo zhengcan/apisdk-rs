@@ -28,6 +28,13 @@ pub(crate) fn build_builder(
                 }
             }
 
+            // Set ClientBuilder
+            #vis fn with_client(self, client: apisdk::ClientBuilder) -> Self {
+                Self {
+                    inner: self.inner.with_client(client)
+                }
+            }
+
             /// Set ApiRouter
             #vis fn with_router<T>(self, router: T) -> Self where T: apisdk::ApiRouter {
                 Self {

@@ -181,13 +181,13 @@ impl Logger {
     fn log_request_payload(&self, level: Level, payload: &RequestPayload) {
         match payload {
             RequestPayload::Json(json) => {
-                log::log!(target: self.log_target, level, "#[{}] Json\n{}", self.request_id, json);
+                log::log!(target: self.log_target, level, "#[{}] Request Json\n{}", self.request_id, json);
             }
             RequestPayload::Form(meta) => {
-                log::log!(target: self.log_target, level, "#[{}] Form\n{:?}", self.request_id, meta);
+                log::log!(target: self.log_target, level, "#[{}] Request Form\n{:?}", self.request_id, meta);
             }
             RequestPayload::Multipart(meta) => {
-                log::log!(target: self.log_target, level, "#[{}] Multipart\n{:?}", self.request_id, meta);
+                log::log!(target: self.log_target, level, "#[{}] Request Multipart\n{:?}", self.request_id, meta);
             }
         }
     }
@@ -202,21 +202,21 @@ impl Logger {
     /// Log response json payload
     pub fn log_response_json(&self, json: &Value) {
         if let Some(level) = self.log_level {
-            log::log!(target: self.log_target, level, "#[{}] Body(Json)\n{}", self.request_id, serde_json::to_string(json).unwrap_or_default());
+            log::log!(target: self.log_target, level, "#[{}] Response Body(Json)\n{}", self.request_id, serde_json::to_string(json).unwrap_or_default());
         }
     }
 
     /// Log response xml payload
     pub fn log_response_xml(&self, xml: &str) {
         if let Some(level) = self.log_level {
-            log::log!(target: self.log_target, level, "#[{}] Body(Xml)\n{}", self.request_id, &xml[0..1024.min(xml.len())]);
+            log::log!(target: self.log_target, level, "#[{}] Response Body(Xml)\n{}", self.request_id, &xml[0..1024.min(xml.len())]);
         }
     }
 
     /// Log response text payload
     pub fn log_response_text(&self, text: &str) {
         if let Some(level) = self.log_level {
-            log::log!(target: self.log_target, level, "#[{}] Body(Text)\n{}", self.request_id, &text[0..1024.min(text.len())]);
+            log::log!(target: self.log_target, level, "#[{}] Response Body(Text)\n{}", self.request_id, &text[0..1024.min(text.len())]);
         }
     }
 

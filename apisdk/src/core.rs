@@ -116,13 +116,7 @@ impl ApiBuilder {
         if self.signature.is_some() {
             client = client.with(SignatureMiddleware);
         }
-        if !self
-            .logger
-            .as_ref()
-            .is_some_and(|l| l.level == log::LevelFilter::Off)
-        {
-            client = client.with(LogMiddleware);
-        }
+        client = client.with(LogMiddleware);
 
         // Apply initialisers
         if let Some(logger) = self.logger {

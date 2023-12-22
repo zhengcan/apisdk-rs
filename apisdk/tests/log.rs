@@ -16,7 +16,7 @@ impl TheApi {
         send!(req, CodeDataMessage).await
     }
 
-    async fn default(&self) -> ApiResult<Payload> {
+    async fn def(&self) -> ApiResult<Payload> {
         let req = self.get("/path/json").await?;
         let req = req.with_extension(LogConfig::default());
         send!(req, CodeDataMessage).await
@@ -33,6 +33,19 @@ impl TheApi {
         let req = req.with_extension(LogConfig::new("error"));
         send!(req, CodeDataMessage).await
     }
+}
+
+#[tokio::test]
+async fn test_log_as_defautl_none() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let api = TheApi::default();
+
+    let res = api.none().await?;
+    log::debug!("res = {:?}", res);
+
+    Ok(())
 }
 
 #[tokio::test]
@@ -68,7 +81,7 @@ async fn test_log_as_default() -> ApiResult<()> {
 
     let api = TheApi::builder().build();
 
-    let res = api.default().await?;
+    let res = api.def().await?;
     log::debug!("res = {:?}", res);
 
     Ok(())
