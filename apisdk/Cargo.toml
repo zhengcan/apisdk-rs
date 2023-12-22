@@ -8,13 +8,17 @@ repository = "https://github.com/zhengcan/apisdk-rs"
 keywords = ["http", "restful", "reqwest", "api"]
 readme = "../README.md"
 
+[package.metadata.release]
+pre-release-replacements = [
+  {file="Cargo.toml", search="apisdk-macros = \"[a-z0-9\\.-]+\"", replace="apisdk-macros = \"{{version}}\""} ,
+]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 doctest = false
 
 [dependencies]
-apisdk-macros = "0.0.4-beta.8"
+apisdk-macros = "0.0.4-rc.1"
 async-trait = "0.1"
 http = "1.0"
 url = "2.5"
