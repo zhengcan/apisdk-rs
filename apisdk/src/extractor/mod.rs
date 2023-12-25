@@ -42,7 +42,7 @@ impl From<&str> for MimeType {
     fn from(value: &str) -> Self {
         let value = match value.split_once(';') {
             Some((left, _)) => left,
-            _ => value.as_ref(),
+            _ => value,
         }
         .trim()
         .to_lowercase();

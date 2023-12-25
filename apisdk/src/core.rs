@@ -181,7 +181,7 @@ impl ApiCore {
     pub async fn build_url(&self, path: impl AsRef<str>) -> ApiResult<(Url, bool)> {
         let endpoint = match self.router.as_ref() {
             Some(router) => router.next_endpoint().await?,
-            None => Box::new(OriginalEndpoint::default()),
+            None => Box::new(OriginalEndpoint),
         };
         endpoint
             .build_url(&self.base_url, path.as_ref())

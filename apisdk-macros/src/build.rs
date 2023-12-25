@@ -172,33 +172,39 @@ pub(crate) fn build_api_methods(vis: Visibility) -> Vec<TokenStream> {
 
 pub(crate) fn build_macro_overrides(_fn_name: Ident) -> Vec<TokenStream> {
     // let fn_name = fn_name.to_string();
-    ["send", "send_json", "send_form", "send_multipart"]
-        .iter()
-        .map(|name| {
-            let macro_name = Ident::new(name, Span::call_site());
-            let macro_with_name = Ident::new(format!("_{}_with", name).as_str(), Span::call_site());
-            quote! {
-                #[allow(unused)]
-                macro_rules! #macro_name {
-                    ($req:expr) => {
-                        async {
-                            apisdk::#macro_with_name!($req, Self::REQ_CONFIG.take()).await
-                        }
-                    };
-                    ($req:expr, $arg:tt) => {
-                        async {
-                            apisdk::#macro_with_name!($req, $arg, Self::REQ_CONFIG.take()).await
-                        }
-                    };
-                    ($req:expr, $arg1:expr, $arg2:tt) => {
-                        async {
-                            apisdk::#macro_with_name!($req, $arg1, $arg2, Self::REQ_CONFIG.take()).await
-                        }
-                    };
-                }
+    [
+        "send",
+        "send_json",
+        "send_xml",
+        "send_form",
+        "send_multipart",
+    ]
+    .iter()
+    .map(|name| {
+        let macro_name = Ident::new(name, Span::call_site());
+        let macro_with_name = Ident::new(format!("_{}_with", name).as_str(), Span::call_site());
+        quote! {
+            #[allow(unused)]
+            macro_rules! #macro_name {
+                ($req:expr) => {
+                    async {
+                        apisdk::#macro_with_name!($req, Self::REQ_CONFIG.take()).await
+                    }
+                };
+                ($req:expr, $arg:tt) => {
+                    async {
+                        apisdk::#macro_with_name!($req, $arg, Self::REQ_CONFIG.take()).await
+                    }
+                };
+                ($req:expr, $arg1:expr, $arg2:tt) => {
+                    async {
+                        apisdk::#macro_with_name!($req, $arg1, $arg2, Self::REQ_CONFIG.take()).await
+                    }
+                };
             }
-        })
-        .collect()
+        }
+    })
+    .collect()
 }
 
 // pub(crate) fn build_simple_json_payload(name: Ident) -> TokenStream {

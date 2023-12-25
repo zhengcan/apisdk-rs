@@ -51,7 +51,7 @@ impl RequestConfigurator {
         let log_filter = extensions
             .get::<LogConfig>()
             .map(|config| config.level)
-            .or_else(|| self.log_filter)
+            .or(self.log_filter)
             .unwrap_or(LevelFilter::Debug);
 
         let request_id = extensions
