@@ -27,7 +27,7 @@ pub(crate) fn parse_meta(meta: proc_macro::TokenStream) -> ApiMeta {
     ApiMeta::from(meta)
 }
 
-pub(crate) fn parse_fields(data: Data) -> (TokenStream, TokenStream) {
+pub(crate) fn parse_fields(data: Data) -> (TokenStream, TokenStream, TokenStream) {
     let empty = Punctuated::new();
     let fields = match data {
         Struct(DataStruct {
@@ -37,19 +37,30 @@ pub(crate) fn parse_fields(data: Data) -> (TokenStream, TokenStream) {
         Struct(DataStruct { fields: Unit, .. }) => &empty,
         _ => unimplemented!("Only works for structs"),
     };
+
     let fields_decl = fields.iter().map(|f| {
         quote! {
             #f
         }
     });
+
     let fields_init = fields.iter().map(|f| {
         let fname = f.ident.clone().unwrap();
         quote! {
             #fname: Default::default()
         }
     });
-    (quote! {#(#fields_decl,)*}, quote! {#(#fields_init,)*})
-    // let fields_init = quote! {
-    //     #(#fields_init,)*
-    // };
+
+    let fields_clone = fields.iter().map(|f| {
+        let fname = f.ident.clone().unwrap();
+        quote! {
+            #fname: self.#fname.clone()
+        }
+    });
+
+    (
+        quote! {#(#fields_decl,)*},
+        quote! {#(#fields_init,)*},
+        quote! {#(#fields_clone,)*},
+    )
 }

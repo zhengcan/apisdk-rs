@@ -51,7 +51,7 @@ pub fn http_api(
     let vis = ast.vis;
     let api_name = ast.ident;
     let api_attrs = ast.attrs;
-    let (fields_decl, fields_init) = parse_fields(ast.data);
+    let (fields_decl, fields_init, fields_clone) = parse_fields(ast.data);
 
     let (builder_name, builder_impl) =
         build_builder(vis.clone(), api_name.clone(), meta, fields_init);
@@ -60,6 +60,7 @@ pub fn http_api(
         api_name.clone(),
         api_attrs,
         fields_decl,
+        fields_clone,
         builder_name,
     );
     let methods = build_api_methods(vis.clone());

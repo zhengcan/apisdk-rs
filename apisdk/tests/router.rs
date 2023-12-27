@@ -4,6 +4,7 @@ use apisdk::{
     send, ApiEndpoint, ApiResult, ApiRouter, ApiRouters, CodeDataMessage, OriginalEndpoint,
     RouteError, UrlRewrite,
 };
+use apisdk_macros::http_api;
 use async_trait::async_trait;
 use common::Payload;
 use url::Url;
@@ -86,6 +87,30 @@ async fn test_route_error() -> ApiResult<()> {
     let res = api.touch().await;
     log::debug!("res = {:?}", res);
     assert!(res.is_ok());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_api_with_member() -> ApiResult<()> {
+    init_logger();
+
+    #[http_api("http://host/path")]
+    #[derive(Debug)]
+    struct NewApi {
+        value: u32,
+    }
+
+    let mut api = NewApi::builder()
+        .with_router(ApiRouters::fixed(("127.0.0.1", 80)))
+        .build();
+    api.value = 666;
+    println!("api = {:?}", api);
+
+    let api2 = api.with_endpoint(("127.0.0.1", 80));
+    println!("api2 = {:?}", api2);
+
+    assert_eq!(api.value, api2.value);
 
     Ok(())
 }

@@ -104,6 +104,7 @@ pub(crate) fn build_api_impl(
     api_name: Ident,
     api_attrs: Vec<Attribute>,
     fields_decl: TokenStream,
+    fields_clone: TokenStream,
     builder_name: Ident,
 ) -> TokenStream {
     quote! {
@@ -132,12 +133,18 @@ pub(crate) fn build_api_impl(
 
             /// Create a new instance with different endpoint
             pub fn with_endpoint(&self, endpoint: impl Into<apisdk::DefaultApiEndpoint>) -> Self {
-                Self { core: std::sync::Arc::new(self.core.reroute(apisdk::ApiRouters::fixed(endpoint))) }
+                Self {
+                    core: std::sync::Arc::new(self.core.reroute(apisdk::ApiRouters::fixed(endpoint))),
+                    #fields_clone
+                }
             }
 
             /// Create a new instance with different router
             pub fn with_router(&self, router: impl apisdk::ApiRouter) -> Self {
-                Self { core: std::sync::Arc::new(self.core.reroute(router)) }
+                Self {
+                    core: std::sync::Arc::new(self.core.reroute(router)),
+                    #fields_clone
+                }
             }
 
             /// Build request url

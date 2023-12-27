@@ -224,6 +224,9 @@ mod tests {
 
     #[test]
     fn test_box_router() {
+        let router = ApiRouters::fixed(("127.0.0.1", 80));
+        dump_router(router);
+
         let boxed: Box<dyn ApiRouter> = Box::new(ApiRouters::fixed(("127.0.0.1", 80)));
         dump_router(boxed);
     }
