@@ -31,7 +31,7 @@ use crate::{async_trait, RouteError, Url, UrlRewrite};
 /// }
 /// ```
 #[async_trait]
-pub trait ApiRouter: 'static + Send + Sync + UrlRewrite {
+pub trait ApiRouter: 'static + Send + Sync {
     /// Get type_name, used in Debug
     fn type_name(&self) -> &str {
         type_name::<Self>()
@@ -50,7 +50,7 @@ pub trait ApiRouter: 'static + Send + Sync + UrlRewrite {
 #[async_trait]
 impl UrlRewrite for Box<dyn ApiRouter> {
     async fn rewrite(&self, url: Url) -> Url {
-        self.as_ref().rewrite(url).await
+        url
     }
 }
 
