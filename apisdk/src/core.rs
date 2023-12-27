@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use crate::{
-    ApiEndpoint, ApiError, ApiResolver, ApiResult, ApiRouter, ApiSignature, Client, ClientBuilder,
-    Initialiser, IntoUrl, LogConfig, LogMiddleware, Method, Middleware, OriginalEndpoint,
-    RequestBuilder, RequestTraceIdMiddleware, ReqwestApiResolver, RewriteHost,
-    RewriteHostMiddleware, RouteError, SignatureMiddleware, Url, UrlBuilder,
+    ApiError, ApiResult, ApiSignature, Client, ClientBuilder, DnsResolver, Initialiser, IntoUrl,
+    LogConfig, LogMiddleware, Method, Middleware, RequestBuilder, RequestTraceIdMiddleware,
+    ReqwestDnsResolver, ReqwestUrlRewriter, RouteError, SignatureMiddleware, Url, UrlOps,
+    UrlRewriter,
 };
 
 /// This struct is used to build an instance of ApiCore
@@ -13,10 +13,10 @@ pub struct ApiBuilder {
     client: ClientBuilder,
     /// Base url for target api
     base_url: Url,
-    /// The holder of ApiResolver
-    resolver: Option<Arc<dyn ApiResolver>>,
-    /// The holder of ApiRouter
-    router: Option<Arc<dyn ApiRouter>>,
+    /// The holder of UrlRewriter
+    rewriter: Option<ReqwestUrlRewriter>,
+    /// The holder of DnsResolver
+    resolver: Option<ReqwestDnsResolver>,
     /// The holder of ApiSignature
     signature: Option<Arc<dyn ApiSignature>>,
     /// The holder of LogConfig
@@ -34,8 +34,8 @@ impl ApiBuilder {
         Ok(Self {
             client: ClientBuilder::default(),
             base_url: base_url.into_url().map_err(ApiError::InvalidUrl)?,
+            rewriter: None,
             resolver: None,
-            router: None,
             signature: None,
             logger: None,
             initialisers: vec![],
@@ -49,26 +49,26 @@ impl ApiBuilder {
         Self { client, ..self }
     }
 
-    /// Set the ApiResolver
-    /// - resolver: ApiResolver
-    pub fn with_resolver<T>(self, resolver: T) -> Self
+    /// Set the UrlRewriter
+    /// - resolver: UrlRewriter
+    pub fn with_rewriter<T>(self, rewriter: T) -> Self
     where
-        T: ApiResolver,
+        T: UrlRewriter,
     {
         Self {
-            resolver: Some(Arc::new(resolver)),
+            rewriter: Some(ReqwestUrlRewriter::new(rewriter)),
             ..self
         }
     }
 
-    /// Set the ApiRouter
-    /// - router: ApiRouter
-    pub fn with_router<T>(self, router: T) -> Self
+    /// Set the DnsResolver
+    /// - resolver: DnsResolver
+    pub fn with_resolver<T>(self, resolver: T) -> Self
     where
-        T: ApiRouter,
+        T: DnsResolver,
     {
         Self {
-            router: Some(Arc::new(router)),
+            resolver: Some(ReqwestDnsResolver::new(resolver)),
             ..self
         }
     }
@@ -121,18 +121,15 @@ impl ApiBuilder {
 
     /// Build an instance of ApiCore
     pub fn build(self) -> ApiCore {
-        let resolver = self
-            .resolver
-            .map(|r| Arc::new(ReqwestApiResolver::new(r, &self.base_url)));
-        let client = match resolver.as_ref() {
-            Some(r) => self.client.dns_resolver(r.clone()),
+        let client = match self.resolver.clone() {
+            Some(r) => self.client.dns_resolver(Arc::new(r)),
             None => self.client,
         };
         let mut client = reqwest_middleware::ClientBuilder::new(client.build().unwrap());
 
         // Apply middleware in correct order
         client = client.with(RequestTraceIdMiddleware);
-        client = client.with(RewriteHostMiddleware);
+        // client = client.with(RewriteHostMiddleware);
         for middleware in self.middlewares {
             client = client.with_arc(middleware);
         }
@@ -152,8 +149,8 @@ impl ApiBuilder {
         ApiCore {
             client: client.build(),
             base_url: self.base_url,
-            resolver,
-            router: self.router,
+            rewriter: self.rewriter,
+            resolver: self.resolver,
             signature: self.signature,
         }
     }
@@ -165,10 +162,10 @@ pub struct ApiCore {
     client: Client,
     /// Base url for target api
     base_url: Url,
-    /// The holder of ReqwestApiResolver
-    resolver: Option<Arc<ReqwestApiResolver>>,
-    /// The holder of ApiRouter
-    router: Option<Arc<dyn ApiRouter>>,
+    /// The holder of ReqwestUrlRewriter
+    rewriter: Option<ReqwestUrlRewriter>,
+    /// The holder of ReqwestDnsResolver
+    resolver: Option<ReqwestDnsResolver>,
     /// The holder of ApiSignature
     signature: Option<Arc<dyn ApiSignature>>,
 }
@@ -179,8 +176,11 @@ impl std::fmt::Debug for ApiCore {
         let mut d = d
             .field("client", &self.client)
             .field("base_url", &self.base_url);
-        if let Some(r) = self.router.as_ref() {
-            d = d.field("router", &r.type_name());
+        if let Some(r) = self.rewriter.as_ref() {
+            d = d.field("rewriter", &r.type_name());
+        }
+        if let Some(r) = self.resolver.as_ref() {
+            d = d.field("resolver", &r.type_name());
         }
         if let Some(s) = self.signature.as_ref() {
             d = d.field("signature", &s.type_name());
@@ -193,53 +193,48 @@ impl ApiCore {
     /// Create a new ApiCore with a different base_url
     pub fn rebase(&self, base_url: impl IntoUrl) -> ApiResult<Self> {
         let base_url = base_url.into_url().map_err(ApiError::InvalidUrl)?;
-        let resolver = self
-            .resolver
-            .as_ref()
-            .map(|r| Arc::new(r.rebase(&base_url)));
         Ok(Self {
             client: self.client.clone(),
             base_url,
-            resolver,
-            router: self.router.clone(),
+            rewriter: self.rewriter.clone(),
+            resolver: self.resolver.clone(),
             signature: self.signature.clone(),
         })
     }
 
-    /// Create a new ApiCore with a different router
-    pub fn reroute(&self, router: impl ApiRouter) -> Self {
-        Self {
-            client: self.client.clone(),
-            base_url: self.base_url.clone(),
-            resolver: self.resolver.clone(),
-            router: Some(Arc::new(router)),
-            signature: self.signature.clone(),
-        }
-    }
+    // /// Get next ApiEndpoint
+    // pub async fn next_endpoint(&self) -> Result<Box<dyn ApiEndpoint>, RouteError> {
+    //     match self.router.as_ref() {
+    //         Some(router) => router.next_endpoint().await,
+    //         None => Ok(Box::new(OriginalEndpoint)),
+    //     }
+    // }
 
-    /// Get next ApiEndpoint
-    pub async fn next_endpoint(&self) -> Result<Box<dyn ApiEndpoint>, RouteError> {
-        match self.router.as_ref() {
-            Some(router) => router.next_endpoint().await,
-            None => Ok(Box::new(OriginalEndpoint)),
-        }
-    }
-
-    /// Get next UrlBuilder
-    pub async fn next_url_builder(&self) -> Result<impl UrlBuilder, RouteError> {
-        let endpoint = self.next_endpoint().await?;
-        Ok((endpoint, self.base_url.clone()))
-    }
+    // /// Get next UrlBuilder
+    // pub async fn next_url_builder(&self) -> Result<impl UrlBuilder, RouteError> {
+    //     let endpoint = self.next_endpoint().await?;
+    //     Ok((endpoint, self.base_url.clone()))
+    // }
 
     /// Build a new request url
     /// - path: relative path to base_url
     ///
     /// Return error when failed to retrieve valid endpoint from ApiRouter
     pub async fn build_url(&self, path: impl AsRef<str>) -> ApiResult<Url> {
-        let endpoint = self.next_endpoint().await?;
-        endpoint
-            .build_url(&self.base_url, path.as_ref())
-            .map_err(|e| e.into())
+        let mut base = self.build_base_url().await?;
+        base.merge_path(path.as_ref());
+        Ok(base)
+    }
+
+    async fn build_base_url(&self) -> Result<Url, RouteError> {
+        let mut base_url = self.base_url.clone();
+        if let Some(router) = self.rewriter.as_ref() {
+            base_url = router.rewrite(base_url).await?;
+        }
+        if let Some(resolver) = self.resolver.as_ref() {
+            base_url = resolver.rewrite(base_url).await?;
+        }
+        Ok(base_url)
     }
 
     /// Build a new HTTP request
@@ -250,22 +245,15 @@ impl ApiCore {
         method: Method,
         path: impl AsRef<str>,
     ) -> ApiResult<RequestBuilder> {
-        // Rewrite
-        // if let Some(router) = self.router.as_ref() {
-        //     //
+        let url = self.build_url(path.as_ref()).await?;
+        let req = self.client.request(method, url);
+
+        // // Keep original HOST if required
+        // if endpoint.reserve_original_host() {
+        //     if let Some(host) = self.base_url.host_str() {
+        //         req = req.with_extension(RewriteHost::new(host));
+        //     }
         // }
-
-        // Resolve
-        let endpoint = self.next_endpoint().await?;
-        let url = endpoint.build_url(&self.base_url, path.as_ref())?;
-        let mut req = self.client.request(method, url);
-
-        // Keep original HOST if required
-        if endpoint.reserve_original_host() {
-            if let Some(host) = self.base_url.host_str() {
-                req = req.with_extension(RewriteHost::new(host));
-            }
-        }
 
         match self.signature.clone() {
             Some(signature) => Ok(req.with_extension(signature)),

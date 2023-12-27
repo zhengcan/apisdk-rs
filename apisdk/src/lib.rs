@@ -6,14 +6,14 @@ mod executor;
 mod extension;
 mod extractor;
 mod result;
-mod rewriter;
+mod url;
 
 pub use crate::core::*;
 pub use crate::executor::*;
 pub use crate::extension::*;
 pub use crate::extractor::*;
 pub use crate::result::*;
-pub use crate::rewriter::*;
+pub use crate::url::*;
 
 // Re-export macros
 pub use apisdk_macros::*;

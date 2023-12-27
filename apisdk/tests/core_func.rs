@@ -1,4 +1,4 @@
-use apisdk::{ApiResult, ApiRouters};
+use apisdk::ApiResult;
 
 use crate::common::{init_logger, TheApi};
 
@@ -12,24 +12,24 @@ impl TheApi {
     }
 }
 
-#[tokio::test]
-async fn test_via_api() -> ApiResult<()> {
-    init_logger();
+// #[tokio::test]
+// async fn test_via_api() -> ApiResult<()> {
+//     init_logger();
 
-    let api = TheApi::default();
+//     let api = TheApi::default();
 
-    let api2 = api.with_endpoint(("127.0.0.1", 80));
-    log::info!("api2 = {:?}", api2);
+//     let api2 = api.with_endpoint(("127.0.0.1", 80));
+//     log::info!("api2 = {:?}", api2);
 
-    let api3 = api.with_router(ApiRouters::random(&[
-        ("127.0.0.1", 80).into(),
-        ("127.0.0.1", 80).into(),
-        ("127.0.0.1", 80).into(),
-    ]));
-    log::info!("api3 = {:?}", api3);
+//     let api3 = api.with_router(ApiRouters::random(&[
+//         ("127.0.0.1", 80).into(),
+//         ("127.0.0.1", 80).into(),
+//         ("127.0.0.1", 80).into(),
+//     ]));
+//     log::info!("api3 = {:?}", api3);
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 #[tokio::test]
 async fn test_via_core() -> ApiResult<()> {

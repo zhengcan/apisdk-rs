@@ -35,17 +35,17 @@ pub(crate) fn build_builder(
                 }
             }
 
-            /// Set ApiResolver
-            pub fn with_resolver<T>(self, resolver: T) -> Self where T: apisdk::ApiResolver {
+            /// Set UrlRewriter
+            pub fn with_rewriter<T>(self, rewriter: T) -> Self where T: apisdk::UrlRewriter {
                 Self {
-                    inner: self.inner.with_resolver(resolver)
+                    inner: self.inner.with_rewriter(rewriter)
                 }
             }
 
-            /// Set ApiRouter
-            pub fn with_router<T>(self, router: T) -> Self where T: apisdk::ApiRouter {
+            /// Set DnsResolver
+            pub fn with_resolver<T>(self, resolver: T) -> Self where T: apisdk::DnsResolver {
                 Self {
-                    inner: self.inner.with_router(router)
+                    inner: self.inner.with_resolver(resolver)
                 }
             }
 
@@ -104,7 +104,7 @@ pub(crate) fn build_api_impl(
     api_name: Ident,
     api_attrs: Vec<Attribute>,
     fields_decl: TokenStream,
-    fields_clone: TokenStream,
+    _fields_clone: TokenStream,
     builder_name: Ident,
 ) -> TokenStream {
     quote! {
@@ -131,21 +131,21 @@ pub(crate) fn build_api_impl(
                 #builder_name::new()
             }
 
-            /// Create a new instance with different endpoint
-            pub fn with_endpoint(&self, endpoint: impl Into<apisdk::DefaultApiEndpoint>) -> Self {
-                Self {
-                    core: std::sync::Arc::new(self.core.reroute(apisdk::ApiRouters::fixed(endpoint))),
-                    #fields_clone
-                }
-            }
+            // /// Create a new instance with different endpoint
+            // pub fn with_endpoint(&self, endpoint: impl Into<apisdk::DefaultApiEndpoint>) -> Self {
+            //     Self {
+            //         core: std::sync::Arc::new(self.core.reroute(apisdk::ApiRouters::fixed(endpoint))),
+            //         #fields_clone
+            //     }
+            // }
 
-            /// Create a new instance with different router
-            pub fn with_router(&self, router: impl apisdk::ApiRouter) -> Self {
-                Self {
-                    core: std::sync::Arc::new(self.core.reroute(router)),
-                    #fields_clone
-                }
-            }
+            // /// Create a new instance with different router
+            // pub fn with_router(&self, router: impl apisdk::ApiRouter) -> Self {
+            //     Self {
+            //         core: std::sync::Arc::new(self.core.reroute(router)),
+            //         #fields_clone
+            //     }
+            // }
 
             /// Build request url
             /// - path: relative path
