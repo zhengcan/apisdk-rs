@@ -1,6 +1,6 @@
 [package]
 name = "apisdk"
-version = "0.0.6-beta.2"
+version = "0.0.6-beta.3"
 edition = "2021"
 license = "MIT"
 description = "A highlevel API client framework for Rust."
@@ -14,7 +14,7 @@ readme = "../README.md"
 doctest = false
 
 [dependencies]
-apisdk-macros = { version = "0.0.6-beta.2", path = "../apisdk-macros" }
+apisdk-macros = { version = "0.0.6-beta.3", path = "../apisdk-macros" }
 async-trait = "0.1"
 futures = "0.3"
 http = "1.0"
