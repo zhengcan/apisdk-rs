@@ -1,12 +1,12 @@
 mod multi;
-mod single;
+mod simple;
 
 use std::{any::type_name, str::FromStr};
 
 use multi::*;
-use single::*;
+use simple::*;
 
-use crate::{async_trait, RouteError, Url};
+use crate::{async_trait, RouteError, Url, UrlRewrite};
 
 /// This trait is used to generate an endpoint for each request
 ///
@@ -31,7 +31,7 @@ use crate::{async_trait, RouteError, Url};
 /// }
 /// ```
 #[async_trait]
-pub trait ApiRouter: 'static + Sync + Send {
+pub trait ApiRouter: 'static + Send + Sync + UrlRewrite {
     /// Get type_name, used in Debug
     fn type_name(&self) -> &str {
         type_name::<Self>()
@@ -45,6 +45,13 @@ pub trait ApiRouter: 'static + Sync + Send {
 
     /// Generate endpoint
     async fn next_endpoint(&self) -> Result<Box<dyn ApiEndpoint>, RouteError>;
+}
+
+#[async_trait]
+impl UrlRewrite for Box<dyn ApiRouter> {
+    async fn rewrite(&self, url: Url) -> Url {
+        self.as_ref().rewrite(url).await
+    }
 }
 
 #[async_trait]
@@ -64,7 +71,7 @@ pub struct ApiRouters;
 impl ApiRouters {
     /// Initiate a fixed ApiRouter
     pub fn fixed(endpoint: impl Into<DefaultApiEndpoint>) -> impl ApiRouter {
-        SingleApiRouter::new(endpoint.into())
+        SimpleApiRouter::new(endpoint.into())
     }
 
     /// Initiate a round robin ApiRouter for multiply endpoints
@@ -78,8 +85,18 @@ impl ApiRouters {
     }
 }
 
+pub trait UrlBuilder {
+    fn build_url(&self, path: &str) -> Result<Url, RouteError>;
+}
+
+impl UrlBuilder for (Box<dyn ApiEndpoint>, Url) {
+    fn build_url(&self, path: &str) -> Result<Url, RouteError> {
+        self.0.build_url(&self.1, path)
+    }
+}
+
 /// This trait is used to build urls
-pub trait ApiEndpoint {
+pub trait ApiEndpoint: Send + Sync {
     fn reserve_original_host(&self) -> bool {
         false
     }
@@ -124,18 +141,22 @@ pub struct DefaultApiEndpoint {
 }
 
 impl DefaultApiEndpoint {
+    /// Create an instance without scheme
     pub fn new_default(host: impl ToString, port: u16) -> Self {
         Self::new(None::<&str>, host, port)
     }
 
+    /// Create an instance with http
     pub fn new_http(host: impl ToString, port: u16) -> Self {
         Self::new(Some("http"), host, port)
     }
 
+    /// Create an instance with https
     pub fn new_https(host: impl ToString, port: u16) -> Self {
         Self::new(Some("https"), host, port)
     }
 
+    /// Create an instance
     pub fn new(scheme: Option<impl ToString>, host: impl ToString, port: u16) -> Self {
         Self {
             scheme: scheme.map(|s| s.to_string()),

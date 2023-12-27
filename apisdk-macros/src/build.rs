@@ -12,7 +12,7 @@ pub(crate) fn build_builder(
     fields_init: TokenStream,
 ) -> (Ident, TokenStream) {
     let name = Ident::new(format!("{}Builder", api_name).as_str(), Span::call_site());
-    let ApiMeta { base_uri } = parse_meta(meta);
+    let ApiMeta { base_url } = parse_meta(meta);
 
     let builder = quote! {
         /// The build is used to customize the api
@@ -21,64 +21,71 @@ pub(crate) fn build_builder(
         }
 
         impl #name {
-            /// Construct a new builder with base_uri
+            /// Construct a new builder with base_url
             fn new() -> Self {
                 Self {
-                    inner: apisdk::ApiBuilder::new(#base_uri).expect("Invalid base_uri"),
+                    inner: apisdk::ApiBuilder::new(#base_url).expect("Invalid base_url"),
                 }
             }
 
             // Set ClientBuilder
-            #vis fn with_client(self, client: apisdk::ClientBuilder) -> Self {
+            pub fn with_client(self, client: apisdk::ClientBuilder) -> Self {
                 Self {
                     inner: self.inner.with_client(client)
                 }
             }
 
+            /// Set ApiResolver
+            pub fn with_resolver<T>(self, resolver: T) -> Self where T: apisdk::ApiResolver {
+                Self {
+                    inner: self.inner.with_resolver(resolver)
+                }
+            }
+
             /// Set ApiRouter
-            #vis fn with_router<T>(self, router: T) -> Self where T: apisdk::ApiRouter {
+            pub fn with_router<T>(self, router: T) -> Self where T: apisdk::ApiRouter {
                 Self {
                     inner: self.inner.with_router(router)
                 }
             }
 
             /// Set ApiSignature
-            #vis fn with_signature<T>(self, signature: T) -> Self where T: apisdk::ApiSignature {
+            pub fn with_signature<T>(self, signature: T) -> Self where T: apisdk::ApiSignature {
                 Self {
                     inner: self.inner.with_signature(signature)
                 }
             }
 
             /// Set initialiser
-            #vis fn with_initialiser<T>(self, initialiser: T) -> Self where T: apisdk::Initialiser {
+            pub fn with_initialiser<T>(self, initialiser: T) -> Self where T: apisdk::Initialiser {
                 Self {
                     inner: self.inner.with_initialiser(initialiser)
                 }
             }
 
             /// Add middleware
-            #vis fn with_middleware<T>(self, middleware: T) -> Self where T: apisdk::Middleware {
+            pub fn with_middleware<T>(self, middleware: T) -> Self where T: apisdk::Middleware {
                 Self {
                     inner: self.inner.with_middleware(middleware)
                 }
             }
 
             /// Set log filter
-            #vis fn with_log<L>(self, level: L) -> Self where L: apisdk::IntoFilter {
+            pub fn with_log<L>(self, level: L) -> Self where L: apisdk::IntoFilter {
                 Self {
                     inner: self.inner.with_logger(apisdk::LogConfig::new(level))
                 }
             }
 
             /// Disable log
-            #vis fn disable_log(self) -> Self {
+            pub fn disable_log(self) -> Self {
                 Self {
                     inner: self.inner.with_logger(apisdk::LogConfig::new(apisdk::LevelFilter::Off))
                 }
             }
 
             /// Build the api instance
-            #vis fn build(self) -> #api_name {
+            pub fn build(self) -> #api_name {
                 let core = self.inner.build();
                 #api_name {
                     core: std::sync::Arc::new(core),
@@ -102,7 +109,7 @@ pub(crate) fn build_api_impl(
     quote! {
         #(#api_attrs)*
         #vis struct #api_name {
-            core: std::sync::Arc<apisdk::ApiCore>,
+            pub core: std::sync::Arc<apisdk::ApiCore>,
             #fields_decl
         }
 
@@ -114,28 +121,38 @@ pub(crate) fn build_api_impl(
 
         impl #api_name {
             thread_local! {
-                #vis static REQ_CONFIG: std::cell::RefCell<apisdk::__internal::RequestConfigurator>
+                pub static REQ_CONFIG: std::cell::RefCell<apisdk::__internal::RequestConfigurator>
                     = std::cell::RefCell::new(apisdk::__internal::RequestConfigurator::default());
             }
 
             /// Create an ApiBuilder
-            #vis fn builder() -> #builder_name {
+            pub fn builder() -> #builder_name {
                 #builder_name::new()
+            }
+
+            /// Create a new instance with different endpoint
+            pub fn with_endpoint(&self, endpoint: impl Into<apisdk::DefaultApiEndpoint>) -> Self {
+                Self { core: std::sync::Arc::new(self.core.reroute(apisdk::ApiRouters::fixed(endpoint))) }
+            }
+
+            /// Create a new instance with different router
+            pub fn with_router(&self, router: impl apisdk::ApiRouter) -> Self {
+                Self { core: std::sync::Arc::new(self.core.reroute(router)) }
             }
 
             /// Build request url
             /// - path: relative path
-            #vis async fn build_url(
+            pub async fn build_url(
                 &self,
                 path: impl AsRef<str>,
             ) -> apisdk::ApiResult<apisdk::Url> {
-                self.core.build_url(path).await.map(|(url, _)| url)
+                self.core.build_url(path).await
             }
 
             /// Build a new HTTP request
             /// - method: HTTP method
             /// - path: relative path
-            #vis async fn request(
+            pub async fn request(
                 &self,
                 method: apisdk::Method,
                 path: impl AsRef<str>,
@@ -147,7 +164,7 @@ pub(crate) fn build_api_impl(
 }
 
 /// Generate shortcut methods for api
-pub(crate) fn build_api_methods(vis: Visibility) -> Vec<TokenStream> {
+pub(crate) fn build_api_methods(_vis: Visibility) -> Vec<TokenStream> {
     [
         "head", "get", "post", "put", "patch", "delete", "options", "trace",
     ]
@@ -158,7 +175,7 @@ pub(crate) fn build_api_methods(vis: Visibility) -> Vec<TokenStream> {
         quote! {
             /// Build a new HTTP request
             /// - path: relative path
-            #vis async fn #method_func(
+            pub async fn #method_func(
                 &self,
                 path: impl AsRef<str>,
             ) -> apisdk::ApiResult<apisdk::RequestBuilder> {

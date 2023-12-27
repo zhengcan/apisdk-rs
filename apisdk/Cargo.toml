@@ -16,6 +16,7 @@ doctest = false
 [dependencies]
 apisdk-macros = { version = "0.0.6-beta.1", path = "../apisdk-macros" }
 async-trait = "0.1"
+futures = "0.3"
 http = "1.0"
 url = "2.5"
 reqwest = { version = "0.11", features = ["json", "multipart"] }

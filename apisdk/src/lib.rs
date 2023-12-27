@@ -6,14 +6,14 @@ mod executor;
 mod extension;
 mod extractor;
 mod result;
-mod router;
+mod rewriter;
 
 pub use crate::core::*;
 pub use crate::executor::*;
 pub use crate::extension::*;
 pub use crate::extractor::*;
 pub use crate::result::*;
-pub use crate::router::*;
+pub use crate::rewriter::*;
 
 // Re-export macros
 pub use apisdk_macros::*;
@@ -25,6 +25,7 @@ pub use async_trait::async_trait;
 pub use serde_json;
 
 // Re-export reqwest types
+pub use reqwest::dns;
 pub use reqwest::header;
 pub use reqwest::multipart;
 pub use reqwest::ClientBuilder;

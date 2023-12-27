@@ -1,8 +1,9 @@
 use std::sync::atomic::AtomicUsize;
 
 use async_trait::async_trait;
+use url::Url;
 
-use crate::{ApiEndpoint, ApiRouter, DefaultApiEndpoint, RouteError};
+use crate::{ApiEndpoint, ApiRouter, DefaultApiEndpoint, RouteError, UrlRewrite};
 
 #[derive(Debug)]
 enum Strategy {
@@ -29,6 +30,13 @@ impl MultiApiRouter {
             strategy: Strategy::Random,
             endpoints: endpoints.to_vec(),
         }
+    }
+}
+
+#[async_trait]
+impl UrlRewrite for MultiApiRouter {
+    async fn rewrite(&self, url: Url) -> Url {
+        url
     }
 }
 

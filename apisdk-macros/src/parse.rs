@@ -11,14 +11,14 @@ use syn::{
 };
 
 pub(crate) struct ApiMeta {
-    pub base_uri: Literal,
+    pub base_url: Literal,
 }
 
 impl From<proc_macro::TokenStream> for ApiMeta {
     fn from(value: proc_macro::TokenStream) -> Self {
-        let base_uri = value.into_iter().next().unwrap().to_string();
+        let base_url = value.into_iter().next().unwrap().to_string();
         Self {
-            base_uri: Literal::from_str(base_uri.as_str()).unwrap(),
+            base_url: Literal::from_str(base_url.as_str()).unwrap(),
         }
     }
 }

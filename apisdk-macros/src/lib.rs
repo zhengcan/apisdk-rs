@@ -10,7 +10,7 @@ mod parse;
 use crate::build::{build_api_impl, build_api_methods, build_builder, build_macro_overrides};
 use crate::parse::parse_fields;
 
-/// Declare a HTTP api with base_uri
+/// Declare a HTTP api with base_url
 ///
 /// # Examples
 ///

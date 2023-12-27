@@ -1,13 +1,14 @@
 use async_trait::async_trait;
+use url::Url;
 
-use crate::{ApiEndpoint, ApiRouter, DefaultApiEndpoint, RouteError};
+use crate::{ApiEndpoint, ApiRouter, DefaultApiEndpoint, RouteError, UrlRewrite};
 
 #[derive(Debug)]
-pub struct SingleApiRouter {
+pub struct SimpleApiRouter {
     endpoint: DefaultApiEndpoint,
 }
 
-impl SingleApiRouter {
+impl SimpleApiRouter {
     pub fn new(endpoint: impl Into<DefaultApiEndpoint>) -> Self {
         Self {
             endpoint: endpoint.into(),
@@ -16,7 +17,14 @@ impl SingleApiRouter {
 }
 
 #[async_trait]
-impl ApiRouter for SingleApiRouter {
+impl UrlRewrite for SimpleApiRouter {
+    async fn rewrite(&self, url: Url) -> Url {
+        url
+    }
+}
+
+#[async_trait]
+impl ApiRouter for SimpleApiRouter {
     async fn next_endpoint(&self) -> Result<Box<dyn ApiEndpoint>, RouteError> {
         Ok(Box::new(self.endpoint.clone()))
     }

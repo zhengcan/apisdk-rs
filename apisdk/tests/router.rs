@@ -2,10 +2,11 @@ use std::sync::atomic::AtomicBool;
 
 use apisdk::{
     send, ApiEndpoint, ApiResult, ApiRouter, ApiRouters, CodeDataMessage, OriginalEndpoint,
-    RouteError,
+    RouteError, UrlRewrite,
 };
 use async_trait::async_trait;
 use common::Payload;
+use url::Url;
 
 use crate::common::{init_logger, start_server, TheApi, PORT};
 
@@ -47,6 +48,13 @@ async fn test_route_error() -> ApiResult<()> {
     #[derive(Debug)]
     struct MyRouter {
         flag: AtomicBool,
+    }
+
+    #[async_trait]
+    impl UrlRewrite for MyRouter {
+        async fn rewrite(&self, url: Url) -> Url {
+            url
+        }
     }
 
     #[async_trait]
