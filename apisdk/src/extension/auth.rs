@@ -6,6 +6,7 @@ use reqwest::{
     Request, Response,
 };
 use reqwest_middleware::Next;
+use serde::{Deserialize, Serialize};
 
 use crate::{digest, Extensions, Middleware};
 
@@ -101,6 +102,9 @@ impl ApiSignature for Box<dyn ApiSignature> {
 
 /// This trait is used to update signature
 pub trait SignatureTrait {
+    /// Update signature to use `Carrier`
+    fn with_carrier(self, carrier: Carrier) -> Self;
+
     /// Update signature to use `Header`
     /// - name: the name of header
     fn with_header_name(self, name: impl ToString) -> Self;
@@ -111,9 +115,10 @@ pub trait SignatureTrait {
 }
 
 /// This enum represents the position of request to carry token.
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub enum Carrier {
     /// Standard `Authorization` header, with `Bearer` auth-scheme
+    #[default]
     BearerAuth,
     /// Standard `Authorization` header, without any auth-scheme
     SchemelessAuth,
@@ -121,12 +126,6 @@ pub enum Carrier {
     Header(String),
     /// Customized query param
     QueryParam(String),
-}
-
-impl Default for Carrier {
-    fn default() -> Self {
-        Self::BearerAuth
-    }
 }
 
 impl Carrier {
@@ -221,6 +220,10 @@ impl TokenProvider for AccessTokenSignature {
 }
 
 impl SignatureTrait for AccessTokenSignature {
+    fn with_carrier(self, carrier: Carrier) -> Self {
+        Self { carrier, ..self }
+    }
+
     fn with_header_name(self, name: impl ToString) -> Self {
         Self {
             carrier: Carrier::Header(name.to_string()),
@@ -363,6 +366,10 @@ impl TokenProvider for HashedTokenSignature {
 }
 
 impl SignatureTrait for HashedTokenSignature {
+    fn with_carrier(self, carrier: Carrier) -> Self {
+        Self { carrier, ..self }
+    }
+
     fn with_header_name(self, name: impl ToString) -> Self {
         Self {
             carrier: Carrier::Header(name.to_string()),

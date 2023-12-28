@@ -86,7 +86,7 @@ where
 #[async_trait]
 impl DnsResolver for IpAddr {
     async fn resolve(&self, _name: &str) -> Option<SocketAddrs> {
-        Some(SocketAddrs::from((self.clone(), 0)))
+        Some(SocketAddrs::from((*self, 0)))
     }
 }
 
@@ -103,6 +103,13 @@ where
 
     async fn resolve(&self, _name: &str) -> Option<SocketAddrs> {
         Some(SocketAddrs::from((self.0.clone(), self.1)))
+    }
+}
+
+#[async_trait]
+impl DnsResolver for Box<dyn DnsResolver> {
+    async fn resolve(&self, name: &str) -> Option<SocketAddrs> {
+        self.as_ref().resolve(name).await
     }
 }
 

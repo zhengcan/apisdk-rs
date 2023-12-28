@@ -1,4 +1,4 @@
-use std::{any::type_name, sync::Arc};
+use std::{any::type_name, net::SocketAddr, sync::Arc};
 
 use async_trait::async_trait;
 use url::Url;
@@ -20,6 +20,23 @@ where
 {
     async fn rewrite(&self, url: Url) -> Result<Url, ApiError> {
         self(url)
+    }
+}
+
+#[async_trait]
+impl UrlRewriter for SocketAddr {
+    async fn rewrite(&self, url: Url) -> Result<Url, ApiError> {
+        let mut url = url;
+        let _ = url.set_ip_host(self.ip());
+        let _ = url.set_port(Some(self.port()));
+        Ok(url)
+    }
+}
+
+#[async_trait]
+impl UrlRewriter for Box<dyn UrlRewriter> {
+    async fn rewrite(&self, url: Url) -> Result<Url, ApiError> {
+        self.as_ref().rewrite(url).await
     }
 }
 
