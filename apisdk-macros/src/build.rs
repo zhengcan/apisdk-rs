@@ -2,19 +2,19 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{Attribute, Visibility};
 
-use crate::parse::{parse_meta, ApiMeta};
+use crate::parse::Metadata;
 
 /// Generate ApiBuilder
 pub(crate) fn build_builder(
+    metadata: &Metadata,
     vis: Visibility,
     api_name: Ident,
-    meta: proc_macro::TokenStream,
     fields_init: TokenStream,
 ) -> (Ident, TokenStream) {
+    let Metadata { base_url, default } = metadata;
     let name = Ident::new(format!("{}Builder", api_name).as_str(), Span::call_site());
-    let ApiMeta { base_url } = parse_meta(meta);
 
-    let builder = quote! {
+    let mut builder = quote! {
         /// The build is used to customize the api
         #vis struct #name {
             inner: apisdk::ApiBuilder,
@@ -84,22 +84,33 @@ pub(crate) fn build_builder(
                 }
             }
 
-            /// Build the api instance
-            pub fn build(self) -> #api_name {
-                let core = self.inner.build();
-                #api_name {
-                    core: std::sync::Arc::new(core),
-                    #fields_init
-                }
+            /// Build the api core
+            pub fn build_core(self) -> std::sync::Arc<apisdk::ApiCore> {
+                std::sync::Arc::new(self.inner.build())
             }
         }
     };
+
+    if *default {
+        builder.extend(quote! {
+            impl #name {
+                /// Build the api instance
+                pub fn build(self) -> #api_name {
+                    #api_name {
+                        core: std::sync::Arc::new(self.inner.build()),
+                        #fields_init
+                    }
+                }
+            }
+        });
+    }
 
     (name, builder)
 }
 
 /// Generate api basic implemations
 pub(crate) fn build_api_impl(
+    metadata: &Metadata,
     vis: Visibility,
     api_name: Ident,
     api_attrs: Vec<Attribute>,
@@ -107,17 +118,13 @@ pub(crate) fn build_api_impl(
     _fields_clone: TokenStream,
     builder_name: Ident,
 ) -> TokenStream {
-    quote! {
+    let Metadata { default, .. } = metadata;
+
+    let mut api = quote! {
         #(#api_attrs)*
         #vis struct #api_name {
             pub core: std::sync::Arc<apisdk::ApiCore>,
             #fields_decl
-        }
-
-        impl Default for #api_name {
-            fn default() -> Self {
-                Self::builder().build()
-            }
         }
 
         impl #api_name {
@@ -151,7 +158,19 @@ pub(crate) fn build_api_impl(
                 self.core.build_request(method, path).await
             }
         }
+    };
+
+    if *default {
+        api.extend(quote! {
+            impl Default for #api_name {
+                fn default() -> Self {
+                    Self::builder().build()
+                }
+            }
+        });
     }
+
+    api
 }
 
 /// Generate shortcut methods for api

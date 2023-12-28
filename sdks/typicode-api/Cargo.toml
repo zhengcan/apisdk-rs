@@ -1,7 +1,11 @@
 [package]
-name = "apisdk-typicode"
+name = "typicode-api"
 version = "0.0.1"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A Typicode Api for Rust (based on apisdk)"
+repository = "https://github.com/zhengcan/apisdk-rs"
+keywords = ["api", "sdk", "reqwest", "restful"]
 publish = false
 
 [package.metadata.release]
@@ -9,7 +13,7 @@ release = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-apisdk = { path = "../../apisdk" }
+apisdk = { version = "0.0.6-rc.4", path = "../../apisdk" }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0" }
 serde_json = { version = "1.0" }

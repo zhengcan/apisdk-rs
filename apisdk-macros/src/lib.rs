@@ -1,6 +1,7 @@
 //! A highlevel API client framework for Rust.
 //! This crate is an internal used crate, please check `apisdk` crate for more details.
 
+use parse::parse_meta;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Expr, ItemFn, Meta};
 
@@ -47,6 +48,8 @@ pub fn http_api(
     meta: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
+    let metadata = parse_meta(meta);
+
     let ast = parse_macro_input!(input as DeriveInput);
     let vis = ast.vis;
     let api_name = ast.ident;
@@ -54,8 +57,9 @@ pub fn http_api(
     let (fields_decl, fields_init, fields_clone) = parse_fields(ast.data);
 
     let (builder_name, builder_impl) =
-        build_builder(vis.clone(), api_name.clone(), meta, fields_init);
+        build_builder(&metadata, vis.clone(), api_name.clone(), fields_init);
     let api_impl = build_api_impl(
+        &metadata,
         vis.clone(),
         api_name.clone(),
         api_attrs,

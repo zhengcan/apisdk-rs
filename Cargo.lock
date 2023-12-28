@@ -82,16 +82,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "apisdk-typicode"
-version = "0.0.1"
-dependencies = [
- "apisdk",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -699,6 +689,20 @@ checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.3",
+]
+
+[[package]]
+name = "instagram-api"
+version = "0.0.1"
+dependencies = [
+ "apisdk",
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-log 0.2.0",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1868,6 +1872,16 @@ name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
+
+[[package]]
+name = "typicode-api"
+version = "0.0.1"
+dependencies = [
+ "apisdk",
+ "serde",
+ "serde_json",
+ "tokio",
+]
 
 [[package]]
 name = "unicase"
