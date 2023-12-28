@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
     ApiError, ApiResult, ApiSignature, Client, ClientBuilder, DnsResolver, Initialiser, IntoUrl,
@@ -140,7 +140,7 @@ impl ApiBuilder {
         // Apply initialisers
         if let Some(logger) = self.logger {
             client = client.with_arc_init(logger);
-        };
+        }
         for initialiser in self.initialisers {
             client = client.with_arc_init(initialiser);
         }
@@ -199,6 +199,45 @@ impl ApiCore {
             resolver: self.resolver.clone(),
             signature: self.signature.clone(),
         })
+    }
+
+    /// Set the UrlRewriter
+    /// - resolver: UrlRewriter
+    pub fn with_rewriter<T>(&self, rewriter: T) -> Self
+    where
+        T: UrlRewriter,
+    {
+        Self {
+            client: self.client.clone(),
+            base_url: self.base_url.clone(),
+            rewriter: Some(ReqwestUrlRewriter::new(rewriter)),
+            resolver: self.resolver.clone(),
+            signature: self.signature.clone(),
+        }
+    }
+
+    /// Set the DnsResolver
+    /// - resolver: DnsResolver
+    pub fn with_resolver<T>(&self, resolver: T) -> Self
+    where
+        T: DnsResolver,
+    {
+        Self {
+            client: self.client.clone(),
+            base_url: self.base_url.clone(),
+            rewriter: self.rewriter.clone(),
+            resolver: Some(ReqwestDnsResolver::new(resolver)),
+            signature: self.signature.clone(),
+        }
+    }
+
+    /// Set rewriter to use endpoint
+    /// - endpoint: SocketAddr
+    pub fn with_endpoint<T>(&self, endpoint: T) -> Self
+    where
+        T: Into<SocketAddr>,
+    {
+        self.with_rewriter(endpoint.into())
     }
 
     /// Build base_url
