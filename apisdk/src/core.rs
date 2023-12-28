@@ -202,30 +202,7 @@ impl ApiCore {
         })
     }
 
-    // /// Get next ApiEndpoint
-    // pub async fn next_endpoint(&self) -> Result<Box<dyn ApiEndpoint>, RouteError> {
-    //     match self.router.as_ref() {
-    //         Some(router) => router.next_endpoint().await,
-    //         None => Ok(Box::new(OriginalEndpoint)),
-    //     }
-    // }
-
-    // /// Get next UrlBuilder
-    // pub async fn next_url_builder(&self) -> Result<impl UrlBuilder, RouteError> {
-    //     let endpoint = self.next_endpoint().await?;
-    //     Ok((endpoint, self.base_url.clone()))
-    // }
-
-    /// Build a new request url
-    /// - path: relative path to base_url
-    ///
-    /// Return error when failed to retrieve valid endpoint from ApiRouter
-    pub async fn build_url(&self, path: impl AsRef<str>) -> ApiResult<Url> {
-        let mut base = self.build_base_url().await?;
-        base.merge_path(path.as_ref());
-        Ok(base)
-    }
-
+    /// Build base_url
     async fn build_base_url(&self) -> Result<Url, RouteError> {
         let mut base_url = self.base_url.clone();
         if let Some(router) = self.rewriter.as_ref() {
@@ -235,6 +212,15 @@ impl ApiCore {
             base_url = resolver.rewrite(base_url).await?;
         }
         Ok(base_url)
+    }
+
+    /// Build a new request url
+    /// - path: relative path to base_url
+    ///
+    /// Return error when failed to retrieve valid endpoint from ApiRouter
+    pub async fn build_url(&self, path: impl AsRef<str>) -> ApiResult<Url> {
+        let base = self.build_base_url().await?;
+        Ok(base.merge_path(path.as_ref()))
     }
 
     /// Build a new HTTP request
@@ -247,13 +233,6 @@ impl ApiCore {
     ) -> ApiResult<RequestBuilder> {
         let url = self.build_url(path.as_ref()).await?;
         let req = self.client.request(method, url);
-
-        // // Keep original HOST if required
-        // if endpoint.reserve_original_host() {
-        //     if let Some(host) = self.base_url.host_str() {
-        //         req = req.with_extension(RewriteHost::new(host));
-        //     }
-        // }
 
         match self.signature.clone() {
             Some(signature) => Ok(req.with_extension(signature)),

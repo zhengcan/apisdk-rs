@@ -1,9 +1,11 @@
-use std::net::SocketAddr;
+use std::net::IpAddr;
 
-use apisdk::{send, ApiResult, DnsResolver};
+use apisdk::{send, ApiResult, DnsResolver, SocketAddrs, UrlOps};
+use apisdk_macros::http_api;
 use async_trait::async_trait;
+use url::Url;
 
-use crate::common::{init_logger, TheApi};
+use crate::common::{init_logger, start_server, TheApi};
 
 mod common;
 
@@ -15,12 +17,14 @@ impl TheApi {
 }
 
 #[tokio::test]
-async fn test_with_resolver_simple() -> ApiResult<()> {
+async fn test_resolver_simple_with_port() -> ApiResult<()> {
     init_logger();
 
     let api = TheApi::builder()
         .with_resolver(([127, 0, 0, 66], 80))
         .build();
+    println!("api = {:?}", api);
+
     let result = api.touch().await;
     println!("result = {:?}", result);
 
@@ -28,7 +32,22 @@ async fn test_with_resolver_simple() -> ApiResult<()> {
 }
 
 #[tokio::test]
-async fn test_with_resolver_full() -> ApiResult<()> {
+async fn test_resolver_simple_without_port() -> ApiResult<()> {
+    init_logger();
+
+    let api = TheApi::builder()
+        .with_resolver(IpAddr::from([127, 0, 0, 66]))
+        .build();
+    println!("api = {:?}", api);
+
+    let result = api.touch().await;
+    println!("result = {:?}", result);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_resolver_full() -> ApiResult<()> {
     init_logger();
 
     struct FullResolver;
@@ -43,38 +62,61 @@ async fn test_with_resolver_full() -> ApiResult<()> {
             Some(9966)
         }
 
-        async fn resolve(&self, _: &str) -> Option<SocketAddr> {
-            Some(SocketAddr::from(([127, 0, 0, 66], 80)))
+        async fn resolve(&self, _: &str) -> Option<SocketAddrs> {
+            Some(SocketAddrs::from(([127, 0, 0, 66], 80)))
         }
     }
 
     let api = TheApi::builder().with_resolver(FullResolver).build();
+    println!("api = {:?}", api);
+
     let result = api.touch().await;
     println!("result = {:?}", result);
 
     Ok(())
 }
 
-// #[tokio::test]
-// async fn test_reserve_host() -> ApiResult<()> {
-//     init_logger();
-//     start_server().await;
+#[tokio::test]
+async fn test_resolver_keep_hostname() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
 
-//     let api = TheApi::builder()
-//         .with_router(ApiRouters::fixed(("127.0.0.1", PORT)))
-//         .build();
+    #[http_api("http://external/v1")]
+    #[derive(Debug)]
+    struct ExternalApi;
 
-//     let res = api.touch().await?;
-//     log::debug!("res = {:?}", res);
-//     let host = res
-//         .headers
-//         .get("host")
-//         .map(|v| v.to_string())
-//         .unwrap_or_default();
-//     assert_eq!("localhost", host);
+    impl ExternalApi {
+        async fn touch(&self) -> ApiResult<()> {
+            let req = self.get("/path/json").await?;
+            send!(req).await
+        }
+    }
 
-//     Ok(())
-// }
+    let api = ExternalApi::builder()
+        .with_resolver(([127, 0, 0, 1], 3030))
+        .build();
+    println!("api = {:?}", api);
+
+    let result = api.touch().await;
+    println!("result = {:?}", result);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_rewrite() -> ApiResult<()> {
+    init_logger();
+
+    let api = TheApi::builder()
+        .with_rewriter(|url: Url| Ok(url.merge_path("/more/")))
+        .build();
+    println!("api = {:?}", api);
+
+    let result = api.touch().await;
+    println!("result = {:?}", result);
+
+    Ok(())
+}
 
 // #[tokio::test]
 // async fn test_route_error() -> ApiResult<()> {

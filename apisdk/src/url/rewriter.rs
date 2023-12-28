@@ -5,14 +5,30 @@ use url::Url;
 
 use crate::RouteError;
 
+/// This trait is used to rewrite base_url
 #[async_trait]
 pub trait UrlRewriter: 'static + Send + Sync {
+    /// Rewrite url if possible
     async fn rewrite(&self, url: Url) -> Result<Url, RouteError>;
 }
 
+#[async_trait]
+impl<F> UrlRewriter for F
+where
+    F: Fn(Url) -> Result<Url, RouteError>,
+    F: 'static + Send + Sync,
+{
+    async fn rewrite(&self, url: Url) -> Result<Url, RouteError> {
+        self(url)
+    }
+}
+
+/// This struct is used to hold the provided `UrlRewriter`, and perform url rewrites
 #[derive(Clone)]
 pub(crate) struct ReqwestUrlRewriter {
+    /// The type_name of provided `UrlRewriter`
     type_name: &'static str,
+    /// The provided `UrlRewriter`
     rewriter: Arc<dyn UrlRewriter>,
 }
 

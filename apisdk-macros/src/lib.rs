@@ -105,7 +105,7 @@ pub fn api_method(
         #fn_vis #fn_sig {
             #(#macros)*
 
-            Self::REQ_CONFIG.set(apisdk::__internal::RequestConfigurator::new(apisdk::_function_path!(), Some(#log_enabled), false));
+            Self::__REQ_CONFIG.set(apisdk::__internal::RequestConfigurator::new(apisdk::_function_path!(), Some(#log_enabled), false));
             #fn_block
         }
     };

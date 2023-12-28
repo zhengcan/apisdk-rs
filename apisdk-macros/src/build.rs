@@ -122,7 +122,7 @@ pub(crate) fn build_api_impl(
 
         impl #api_name {
             thread_local! {
-                pub static REQ_CONFIG: std::cell::RefCell<apisdk::__internal::RequestConfigurator>
+                pub static __REQ_CONFIG: std::cell::RefCell<apisdk::__internal::RequestConfigurator>
                     = std::cell::RefCell::new(apisdk::__internal::RequestConfigurator::default());
             }
 
@@ -130,22 +130,6 @@ pub(crate) fn build_api_impl(
             pub fn builder() -> #builder_name {
                 #builder_name::new()
             }
-
-            // /// Create a new instance with different endpoint
-            // pub fn with_endpoint(&self, endpoint: impl Into<apisdk::DefaultApiEndpoint>) -> Self {
-            //     Self {
-            //         core: std::sync::Arc::new(self.core.reroute(apisdk::ApiRouters::fixed(endpoint))),
-            //         #fields_clone
-            //     }
-            // }
-
-            // /// Create a new instance with different router
-            // pub fn with_router(&self, router: impl apisdk::ApiRouter) -> Self {
-            //     Self {
-            //         core: std::sync::Arc::new(self.core.reroute(router)),
-            //         #fields_clone
-            //     }
-            // }
 
             /// Build request url
             /// - path: relative path
@@ -212,17 +196,17 @@ pub(crate) fn build_macro_overrides(_fn_name: Ident) -> Vec<TokenStream> {
             macro_rules! #macro_name {
                 ($req:expr) => {
                     async {
-                        apisdk::#macro_with_name!($req, Self::REQ_CONFIG.take()).await
+                        apisdk::#macro_with_name!($req, Self::__REQ_CONFIG.take()).await
                     }
                 };
                 ($req:expr, $arg:tt) => {
                     async {
-                        apisdk::#macro_with_name!($req, $arg, Self::REQ_CONFIG.take()).await
+                        apisdk::#macro_with_name!($req, $arg, Self::__REQ_CONFIG.take()).await
                     }
                 };
                 ($req:expr, $arg1:expr, $arg2:tt) => {
                     async {
-                        apisdk::#macro_with_name!($req, $arg1, $arg2, Self::REQ_CONFIG.take()).await
+                        apisdk::#macro_with_name!($req, $arg1, $arg2, Self::__REQ_CONFIG.take()).await
                     }
                 };
             }

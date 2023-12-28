@@ -6,11 +6,13 @@ use hickory_resolver::{
     Resolver,
 };
 
-use crate::DnsResolver;
+use crate::{DnsResolver, SocketAddrs};
 
-pub struct Dns(Resolver);
+/// The NameServer performs DNS queries
+pub struct NameServer(Resolver);
 
-impl Dns {
+impl NameServer {
+    /// Create an instance with many NS IPs
     pub fn new(ips: &[IpAddr]) -> Self {
         Self(
             Resolver::new(
@@ -27,12 +29,12 @@ impl Dns {
 }
 
 #[async_trait]
-impl DnsResolver for Dns {
-    async fn resolve(&self, name: &str) -> Option<SocketAddr> {
-        self.0
-            .lookup_ip(name)
-            .ok()
-            .and_then(|lookup_ip| lookup_ip.iter().next())
-            .map(|i| SocketAddr::from((i, 0)))
+impl DnsResolver for NameServer {
+    async fn resolve(&self, name: &str) -> Option<SocketAddrs> {
+        self.0.lookup_ip(name).ok().map(|lookup_ip| {
+            SocketAddrs::new(Box::new(
+                lookup_ip.into_iter().map(|ip| SocketAddr::from((ip, 0))),
+            ))
+        })
     }
 }

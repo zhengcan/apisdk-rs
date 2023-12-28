@@ -3,7 +3,7 @@ name = "apisdk-macros"
 version = "0.0.6-beta.5"
 edition = "2021"
 license = "MIT"
-description = "A highlevel API client framework for Rust."
+description = "An easy-to-use API toolkit for writing HTTP API Clients for Rust."
 repository = "https://github.com/zhengcan/apisdk-rs"
 keywords = ["http", "restful", "reqwest", "api"]
 

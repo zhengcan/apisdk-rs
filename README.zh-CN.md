@@ -12,7 +12,7 @@
     - 使用 [quick-xml](https://github.com/tafia/quick-xml) 处理 XML 响应
 - 支持 `X-Request-ID` 和 `X-Trace-ID`/`X-Span-ID`
 - 更多自定义能力
-    - 可以使用 `ApiRouter` 重写 URL 中的 `host` 和 `port`
+    - 提供 `UrlRewriter` 和 `DnsResolver` 用于定制 URL 和 API 端点
     - 可以使用 `ApiSignature` 设置 `Authorization` 鉴权头
     - 通过集成 [reqwest-middleware](https://github.com/TrueLayer/reqwest-middleware/) 来提供中间件能力
     - 可以使用 `MockServer` 来提供仿冒服务器端响应
@@ -25,6 +25,23 @@
 为此，我们经常会开发一些辅助功能来实现上述功能。 这个 crate 的设计目的是简化这部分的开发工作，提供通用的设计实现。
 
 # 入门
+
+### 安装
+
+更新 `Cargo.toml` 来将本 crate 添加为依赖。
+
+```toml
+[dependencies]
+apisdk = { version = "0.0.6" }
+```
+
+本 crate 包含以下特性：
+- uuid
+    - 使用 [`uuid`](https://crates.io/crates/uuid) 替代 [`nanoid`](https://crates.io/crates/nanoid) 来生成 `X-Request-ID` 和 `X-Trace-ID`
+- dns
+    - 安装 [`hickory-resolver`](https://crates.io/crates/hickory-resolver) (别名 [`trust-dns-resolver`](https://crates.io/crates/trust-dns-resolver))，且支持将其用于 DNS 查询
+
+### 定义 API 对象
 
 如果需要定义一个非常简单的 API，我们仅需要若干行代码。
 
@@ -86,8 +103,10 @@ async fn foo() -> ApiResult<()> {
 
 - `with_client`
     - 传入 `reqwest::ClientBuilder` 来定制化底层 Client
-- `with_router`
-    - 重写 HTTP Host 和 端口
+- `with_rewriter`
+    - 重写 HTTP Url
+- `with_resolver`
+    - 自定义 DNS 查询
 - `with_signature`
     - 为每个请求设置身份信息
 - `with_initialiser` & `with_middleware`
@@ -176,3 +195,4 @@ let _ = send!(req, Data).await?;
 let _ = send!(req, Json<Data>).await?;
 ```
 
+你可以查看 `tests` 来找到更多示例。

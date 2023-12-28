@@ -12,7 +12,7 @@ An easy-to-use API toolkit for writing HTTP API Clients for Rust.
     - Use [quick-xml](https://github.com/tafia/quick-xml) to process XML response
 - Support `X-Request-ID` and `X-Trace-ID`/`X-Span-ID`
 - More customization capabilities
-    - Rewrite `host` and `port` of URLs by using `ApiRouter`
+    - Provide `UrlRewriter` and `DnsResolver` to customize URL and API endpoint
     - Set `Authorization` header by using `ApiSignature`
     - Provide middlewares by integrate [reqwest-middleware](https://github.com/TrueLayer/reqwest-middleware/)
     - Mock server response by using `MockServer`
@@ -25,6 +25,23 @@ When using [reqwest](https://github.com/seanmonstar/reqwest/) to send API reques
 For this reason, we often develop some auxiliary functions to achieve the above functions. The design purpose of this crate is to simplify this part of the development work and provide a common design implementation.
 
 # Getting Started
+
+### Install
+
+Update `Cargo.toml` to add this crate as dependency.
+
+```toml
+[dependencies]
+apisdk = { version = "0.0.6" }
+```
+
+This crate has several features:
+- uuid
+    - use [`uuid`](https://crates.io/crates/uuid) instead of [`nanoid`](https://crates.io/crates/nanoid) to generate `X-Request-ID` and `X-Trace-ID`
+- dns
+    - install [`hickory-resolver`](https://crates.io/crates/hickory-resolver) (aka. [`trust-dns-resolver`](https://crates.io/crates/trust-dns-resolver)), and able to use it to do DNS queries
+
+### Define API struct
 
 To define a very simple API, we just need a few lines of code.
 
@@ -52,6 +69,8 @@ impl MyApi {
     }
 }
 ```
+
+### Call APIs
 
 To use the API, just follow these steps.
 
@@ -86,8 +105,10 @@ We can use `XxxApi::builder()` to get an instance of `ApiBuilder`, and call foll
 
 - `with_client`
     - set `reqwest::ClientBuilder` to customize Client
-- `with_router`
-    - rewrite HTTP Host and port
+- `with_rewriter`
+    - rewrite HTTP Url
+- `with_resolver`
+    - custom DNS queries
 - `with_signature`
     - set credentials for each request
 - `with_initialiser` & `with_middleware`
@@ -176,3 +197,4 @@ let _ = send!(req, Data).await?;
 let _ = send!(req, Json<Data>).await?;
 ```
 
+You may check `tests` for more examples.

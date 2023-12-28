@@ -13,23 +13,81 @@ use hyper::{
 use reqwest::dns::{Addrs, Resolve, Resolving};
 use url::Url;
 
-use crate::RouteError;
-
-use super::rewriter::UrlRewriter;
+use crate::{RouteError, UrlRewriter};
 
 pub(crate) type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
+/// This struct is used to provides many SocketAddrs
+pub struct SocketAddrs {
+    iter: Addrs,
+}
+
+impl SocketAddrs {
+    /// Construct an instance based on Iterator of SocketAddrs
+    pub fn new(addrs: Addrs) -> Self {
+        Self { iter: addrs }
+    }
+
+    /// Construct an instance based on vector of SocketAddrs
+    pub fn new_multi(addrs: Vec<SocketAddr>) -> Self {
+        Self {
+            iter: Box::new(addrs.into_iter()),
+        }
+    }
+
+    /// Construct an instance based on single SocketAddr
+    pub fn new_single(addr: SocketAddr) -> Self {
+        Self {
+            iter: Box::new(Some(addr).into_iter()),
+        }
+    }
+}
+
+impl From<IpAddr> for SocketAddrs {
+    fn from(value: IpAddr) -> Self {
+        SocketAddrs::new_single(SocketAddr::from((value, 0)))
+    }
+}
+
+impl<I: Into<IpAddr>> From<(I, u16)> for SocketAddrs {
+    fn from(value: (I, u16)) -> Self {
+        SocketAddrs::new_single(SocketAddr::from(value))
+    }
+}
+
+/// This trait is used to performing DNS queries
 #[async_trait]
 pub trait DnsResolver: 'static + Send + Sync {
+    /// Return `Some` if scheme should be changed
     fn get_scheme(&self) -> Option<&str> {
         None
     }
 
+    /// Return `Some` if port should be changed
     fn get_port(&self) -> Option<u16> {
         None
     }
 
-    async fn resolve(&self, name: &str) -> Option<SocketAddr>;
+    /// Do DNS queries
+    async fn resolve(&self, name: &str) -> Option<SocketAddrs>;
+}
+
+#[async_trait]
+impl<F> DnsResolver for F
+where
+    F: Fn(&str) -> Option<SocketAddrs>,
+    F: 'static + Send + Sync,
+{
+    async fn resolve(&self, name: &str) -> Option<SocketAddrs> {
+        self(name)
+    }
+}
+
+#[async_trait]
+impl DnsResolver for IpAddr {
+    async fn resolve(&self, _name: &str) -> Option<SocketAddrs> {
+        Some(SocketAddrs::from((self.clone(), 0)))
+    }
 }
 
 #[async_trait]
@@ -43,11 +101,12 @@ where
         Some(self.1)
     }
 
-    async fn resolve(&self, _name: &str) -> Option<SocketAddr> {
-        Some(SocketAddr::from((self.0.clone(), self.1)))
+    async fn resolve(&self, _name: &str) -> Option<SocketAddrs> {
+        Some(SocketAddrs::from((self.0.clone(), self.1)))
     }
 }
 
+/// This is default DNS Resolver of reqwest
 #[derive(Clone)]
 struct FallbackResolver(GaiResolver);
 
@@ -62,19 +121,12 @@ impl Resolve for FallbackResolver {
     }
 }
 
-struct SingleSocketAddr(Option<SocketAddr>);
-
-impl Iterator for SingleSocketAddr {
-    type Item = SocketAddr;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.take()
-    }
-}
-
+/// This struct is used to hold the provided `DnsResolver`, and perform DNS queries
 #[derive(Clone)]
 pub(crate) struct ReqwestDnsResolver {
+    /// The type_name of provided `DnsResolver`
     type_name: &'static str,
+    /// The provided `DnsResolver`
     resolver: Arc<dyn DnsResolver>,
     fallback: FallbackResolver,
 }
@@ -98,6 +150,7 @@ impl ReqwestDnsResolver {
 
 #[async_trait]
 impl UrlRewriter for ReqwestDnsResolver {
+    /// Rewrite url if scheme and/or port should be changed
     async fn rewrite(&self, url: Url) -> Result<Url, RouteError> {
         let mut url = url;
         if let Some(scheme) = self.resolver.get_scheme() {
@@ -114,9 +167,8 @@ impl Resolve for ReqwestDnsResolver {
     fn resolve(&self, name: Name) -> Resolving {
         let me = self.clone();
         Box::pin(async move {
-            if let Some(addr) = me.resolver.resolve(name.as_str()).await {
-                let addrs: Addrs = Box::new(SingleSocketAddr(Some(addr)));
-                return Ok(addrs);
+            if let Some(addrs) = me.resolver.resolve(name.as_str()).await {
+                return Ok(addrs.iter);
             }
             me.fallback.resolve(name).await
         })
