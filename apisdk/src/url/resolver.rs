@@ -13,7 +13,7 @@ use hyper::{
 use reqwest::dns::{Addrs, Resolve, Resolving};
 use url::Url;
 
-use crate::{RouteError, UrlRewriter};
+use crate::{ApiError, UrlRewriter};
 
 pub(crate) type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -151,7 +151,7 @@ impl ReqwestDnsResolver {
 #[async_trait]
 impl UrlRewriter for ReqwestDnsResolver {
     /// Rewrite url if scheme and/or port should be changed
-    async fn rewrite(&self, url: Url) -> Result<Url, RouteError> {
+    async fn rewrite(&self, url: Url) -> Result<Url, ApiError> {
         let mut url = url;
         if let Some(scheme) = self.resolver.get_scheme() {
             let _ = url.set_scheme(scheme);

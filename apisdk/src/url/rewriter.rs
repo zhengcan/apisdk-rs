@@ -3,22 +3,22 @@ use std::{any::type_name, sync::Arc};
 use async_trait::async_trait;
 use url::Url;
 
-use crate::RouteError;
+use crate::ApiError;
 
 /// This trait is used to rewrite base_url
 #[async_trait]
 pub trait UrlRewriter: 'static + Send + Sync {
     /// Rewrite url if possible
-    async fn rewrite(&self, url: Url) -> Result<Url, RouteError>;
+    async fn rewrite(&self, url: Url) -> Result<Url, ApiError>;
 }
 
 #[async_trait]
 impl<F> UrlRewriter for F
 where
-    F: Fn(Url) -> Result<Url, RouteError>,
+    F: Fn(Url) -> Result<Url, ApiError>,
     F: 'static + Send + Sync,
 {
-    async fn rewrite(&self, url: Url) -> Result<Url, RouteError> {
+    async fn rewrite(&self, url: Url) -> Result<Url, ApiError> {
         self(url)
     }
 }
@@ -50,7 +50,7 @@ impl ReqwestUrlRewriter {
 
 #[async_trait]
 impl UrlRewriter for ReqwestUrlRewriter {
-    async fn rewrite(&self, url: Url) -> Result<Url, RouteError> {
+    async fn rewrite(&self, url: Url) -> Result<Url, ApiError> {
         self.rewriter.rewrite(url).await
     }
 }

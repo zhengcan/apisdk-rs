@@ -3,8 +3,7 @@ use std::sync::Arc;
 use crate::{
     ApiError, ApiResult, ApiSignature, Client, ClientBuilder, DnsResolver, Initialiser, IntoUrl,
     LogConfig, LogMiddleware, Method, Middleware, RequestBuilder, RequestTraceIdMiddleware,
-    ReqwestDnsResolver, ReqwestUrlRewriter, RouteError, SignatureMiddleware, Url, UrlOps,
-    UrlRewriter,
+    ReqwestDnsResolver, ReqwestUrlRewriter, SignatureMiddleware, Url, UrlOps, UrlRewriter,
 };
 
 /// This struct is used to build an instance of ApiCore
@@ -203,7 +202,7 @@ impl ApiCore {
     }
 
     /// Build base_url
-    async fn build_base_url(&self) -> Result<Url, RouteError> {
+    async fn build_base_url(&self) -> Result<Url, ApiError> {
         let mut base_url = self.base_url.clone();
         if let Some(router) = self.rewriter.as_ref() {
             base_url = router.rewrite(base_url).await?;

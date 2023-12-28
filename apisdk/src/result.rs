@@ -1,38 +1,14 @@
-use reqwest::Url;
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::{MiddlewareError, MimeType};
 
-/// Route Error
-#[derive(Debug, Error)]
-pub enum RouteError {
-    /// Service discovery error
-    #[error("Service discovery error: {0}")]
-    ServiceDiscovery(anyhow::Error),
-    /// IO error
-    #[error("IO error: {0}")]
-    IoError(std::io::Error),
-    /// Update scheme error
-    #[error("Update scheme error: {0} => {1}")]
-    UpdateScheme(Url, String),
-    /// Update host error
-    #[error("Update host error: {0} => {1}")]
-    UpdateHost(Url, String, url::ParseError),
-    /// Update port error
-    #[error("Update port error: {0} => :{1}")]
-    UpdatePort(Url, u16),
-    /// Custom error
-    #[error("Custom error: {0}")]
-    Custom(String),
-}
-
 /// Api Error
 #[derive(Debug, Error)]
 pub enum ApiError {
-    /// Route error
-    #[error("Route error: {0}")]
-    Route(#[from] RouteError),
+    /// Service discovery error
+    #[error("Service discovery error: {0}")]
+    ServiceDiscovery(anyhow::Error),
     /// Invalid URL
     #[error("Invalid URL: {0}")]
     InvalidUrl(reqwest::Error),
@@ -94,7 +70,7 @@ impl ApiError {
     /// Try to retrieve `error_code`
     pub fn as_error_code(&self) -> i32 {
         match self {
-            Self::Route(..)
+            Self::ServiceDiscovery(..)
             | Self::InvalidUrl(..)
             | Self::BuildRequest(..)
             | Self::Reqwest(..)
