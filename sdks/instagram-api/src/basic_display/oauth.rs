@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use apisdk::{send_form, ApiResult};
 use serde::{Deserialize, Serialize};
+use strum::AsRefStr;
 
 use crate::InstagramBasicDisplayApi;
 
@@ -9,7 +10,7 @@ impl InstagramBasicDisplayApi {
     pub async fn build_authorize_url(
         &self,
         redirect_uri: impl AsRef<str>,
-        scope: impl AsRef<str>,
+        scope: impl IntoIterator<Item = Scope>,
         state: Option<impl AsRef<str>>,
     ) -> String {
         let mut url = self.build_url("/oauth/authorize").await.unwrap();
@@ -17,7 +18,15 @@ impl InstagramBasicDisplayApi {
             let mut query_pairs = url.query_pairs_mut();
             query_pairs.append_pair("client_id", &self.secret.app_id);
             query_pairs.append_pair("redirect_uri", redirect_uri.as_ref());
-            query_pairs.append_pair("scope", scope.as_ref());
+            query_pairs.append_pair(
+                "scope",
+                scope
+                    .into_iter()
+                    .map(|s| s.as_ref().to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+                    .as_str(),
+            );
             query_pairs.append_pair("response_type", "code");
             if let Some(state) = state {
                 query_pairs.append_pair("state", state.as_ref());
@@ -43,6 +52,15 @@ impl InstagramBasicDisplayApi {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, AsRefStr)]
+#[serde(rename_all = "snake_case")]
+pub enum Scope {
+    #[strum(serialize = "user_profile")]
+    UserProfile,
+    #[strum(serialize = "user_media")]
+    UserMedia,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShortLiveUserdAccessToken {
     user_id: u64,
@@ -51,7 +69,7 @@ pub struct ShortLiveUserdAccessToken {
 
 #[cfg(test)]
 mod tests {
-    use crate::basic_display::tests::create_api;
+    use crate::{basic_display::tests::create_api, Scope};
 
     #[tokio::test]
     async fn test_build_authorize_url() {
@@ -59,7 +77,7 @@ mod tests {
         let url = api
             .build_authorize_url(
                 "http://site/redirect_uri",
-                "user_profile,user_media",
+                vec![Scope::UserProfile, Scope::UserMedia],
                 None::<&str>,
             )
             .await;
