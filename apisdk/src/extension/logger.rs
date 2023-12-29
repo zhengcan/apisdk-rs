@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr, time::Instant};
+use std::{collections::HashMap, str::FromStr, sync::OnceLock, time::Instant};
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
@@ -11,6 +11,17 @@ use task_local_extensions::Extensions;
 
 use crate::ResponseBody;
 
+static DEFAULT_LOG_LEVEL: OnceLock<LevelFilter> = OnceLock::new();
+
+/// Set the log level as global default
+pub fn init_default_log_level(level: LevelFilter) -> Result<(), LevelFilter> {
+    DEFAULT_LOG_LEVEL.set(level)
+}
+
+pub(crate) fn get_default_log_level() -> LevelFilter {
+    *DEFAULT_LOG_LEVEL.get_or_init(|| LevelFilter::Debug)
+}
+
 /// This trait is used to create `LevelFilter`
 pub trait IntoFilter {
     fn into_filter(self) -> Option<LevelFilter>;
@@ -19,7 +30,7 @@ pub trait IntoFilter {
 impl IntoFilter for bool {
     fn into_filter(self) -> Option<LevelFilter> {
         if self {
-            Some(LevelFilter::Debug)
+            Some(get_default_log_level())
         } else {
             Some(LevelFilter::Off)
         }
@@ -55,7 +66,7 @@ pub struct LogConfig {
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            level: LevelFilter::Debug,
+            level: get_default_log_level(),
         }
     }
 }
@@ -67,7 +78,7 @@ impl LogConfig {
         L: IntoFilter,
     {
         Self {
-            level: level.into_filter().unwrap_or(LevelFilter::Debug),
+            level: level.into_filter().unwrap_or(get_default_log_level()),
         }
     }
 

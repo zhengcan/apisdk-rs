@@ -1,4 +1,4 @@
-use apisdk::{send, ApiResult, CodeDataMessage, LogConfig};
+use apisdk::{init_default_log_level, send, ApiResult, CodeDataMessage, LogConfig};
 
 use crate::common::{init_logger, start_server, Payload, TheApi};
 
@@ -33,6 +33,21 @@ impl TheApi {
         let req = req.with_extension(LogConfig::new("error"));
         send!(req, CodeDataMessage).await
     }
+}
+
+#[tokio::test]
+async fn test_global_default() -> ApiResult<()> {
+    init_logger();
+    start_server().await;
+
+    let _ = init_default_log_level(log::LevelFilter::Warn);
+
+    let api = TheApi::default();
+
+    let res = api.none().await?;
+    log::debug!("res = {:?}", res);
+
+    Ok(())
 }
 
 #[tokio::test]
