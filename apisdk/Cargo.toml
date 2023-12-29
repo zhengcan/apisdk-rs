@@ -1,9 +1,9 @@
 [package]
 name = "apisdk"
-version = "0.0.4"
+version = "0.0.7"
 edition = "2021"
-license = "MIT"
-description = "A highlevel API client framework for Rust."
+license = "MIT OR Apache-2.0"
+description = "An easy-to-use API toolkit for writing HTTP API Clients for Rust."
 repository = "https://github.com/zhengcan/apisdk-rs"
 keywords = ["http", "restful", "reqwest", "api"]
 readme = "../README.md"
@@ -14,17 +14,21 @@ readme = "../README.md"
 doctest = false
 
 [dependencies]
-apisdk-macros = { version = "0.0.4", path = "../apisdk-macros" }
+apisdk-macros = { version = "0.0.7", path = "../apisdk-macros" }
 async-trait = "0.1"
+futures = "0.3"
 http = "1.0"
 url = "2.5"
 reqwest = { version = "0.11", features = ["json", "multipart"] }
 reqwest-middleware = "0.2"
+hickory-resolver = { version = "0.24", optional = true }
 hyper = "0.14"
 task-local-extensions = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 quick-xml = { version = "0.31", features = ["serialize"] }
+regex = "1.10"
+lazy_static = "1.4"
 nanoid = "0.4"
 uuid = { version = "1.6", features = ["v4"], optional = true }
 base64 = "0.21"
@@ -54,3 +58,4 @@ opentelemetry = "0.21"
 [features]
 default = []
 uuid = ["dep:uuid"]
+dns = ['dep:hickory-resolver']

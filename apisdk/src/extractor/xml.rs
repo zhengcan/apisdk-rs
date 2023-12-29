@@ -1,6 +1,7 @@
 use std::any::TypeId;
 
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 
 use crate::{ApiError, ApiResult, MimeType, ResponseBody};
 
@@ -14,7 +15,10 @@ impl Xml {
         T: 'static + DeserializeOwned,
     {
         let type_id = TypeId::of::<T>();
-        if type_id == TypeId::of::<String>() {
+        if type_id == TypeId::of::<()>() {
+            serde_json::from_value(Value::Null)
+                .map_err(|_| ApiError::Other("Impossible".to_string()))
+        } else if type_id == TypeId::of::<String>() {
             let value = serde_json::Value::String(text);
             serde_json::from_value(value).map_err(|_| ApiError::Other("Impossible".to_string()))
         } else {
@@ -27,6 +31,12 @@ impl Xml {
     where
         T: 'static + DeserializeOwned,
     {
+        let type_id = TypeId::of::<T>();
+        if type_id == TypeId::of::<()>() {
+            return serde_json::from_value(Value::Null)
+                .map_err(|_| ApiError::Other("Impossible".to_string()));
+        }
+
         match body {
             ResponseBody::Xml(xml) => Self::do_try_parse(xml),
             ResponseBody::Text(text) => {

@@ -1,6 +1,7 @@
 //! A highlevel API client framework for Rust.
 //! This crate is an internal used crate, please check `apisdk` crate for more details.
 
+use parse::parse_meta;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Expr, ItemFn, Meta};
 
@@ -10,7 +11,7 @@ mod parse;
 use crate::build::{build_api_impl, build_api_methods, build_builder, build_macro_overrides};
 use crate::parse::parse_fields;
 
-/// Declare a HTTP api with base_uri
+/// Declare a HTTP api with base_url
 ///
 /// # Examples
 ///
@@ -47,19 +48,23 @@ pub fn http_api(
     meta: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
+    let metadata = parse_meta(meta);
+
     let ast = parse_macro_input!(input as DeriveInput);
     let vis = ast.vis;
     let api_name = ast.ident;
     let api_attrs = ast.attrs;
-    let (fields_decl, fields_init) = parse_fields(ast.data);
+    let (fields_decl, fields_init, fields_clone) = parse_fields(ast.data);
 
     let (builder_name, builder_impl) =
-        build_builder(vis.clone(), api_name.clone(), meta, fields_init);
+        build_builder(&metadata, vis.clone(), api_name.clone(), fields_init);
     let api_impl = build_api_impl(
+        &metadata,
         vis.clone(),
         api_name.clone(),
         api_attrs,
         fields_decl,
+        fields_clone,
         builder_name,
     );
     let methods = build_api_methods(vis.clone());
@@ -104,7 +109,7 @@ pub fn api_method(
         #fn_vis #fn_sig {
             #(#macros)*
 
-            Self::REQ_CONFIG.set(apisdk::__internal::RequestConfigurator::new(apisdk::_function_path!(), Some(#log_enabled), false));
+            Self::__REQ_CONFIG.set(apisdk::__internal::RequestConfigurator::new(apisdk::_function_path!(), Some(#log_enabled), false));
             #fn_block
         }
     };

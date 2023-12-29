@@ -1,6 +1,8 @@
 # API SDK
 
-A highlevel API client framework for Rust.
+[English](README.md) ∙ [简体中文](README.zh-CN.md)
+
+An easy-to-use API toolkit for writing HTTP API Clients for Rust.
 
 - Built on top of [reqwest](https://github.com/seanmonstar/reqwest/) to handle HTTP requests
 - Macros to define API and send requests
@@ -9,8 +11,8 @@ A highlevel API client framework for Rust.
     - Use [serde_json](https://github.com/serde-rs/json) to process JSON response
     - Use [quick-xml](https://github.com/tafia/quick-xml) to process XML response
 - Support `X-Request-ID` and `X-Trace-ID`/`X-Span-ID`
-- More customizations
-    - Rewrite `host` and `port` of URLs by using `ApiRouter`
+- More customization capabilities
+    - Provide `UrlRewriter` and `DnsResolver` to customize URL and API endpoint
     - Set `Authorization` header by using `ApiSignature`
     - Provide middlewares by integrate [reqwest-middleware](https://github.com/TrueLayer/reqwest-middleware/)
     - Mock server response by using `MockServer`
@@ -24,6 +26,23 @@ For this reason, we often develop some auxiliary functions to achieve the above 
 
 # Getting Started
 
+### Install
+
+Update `Cargo.toml` to add this crate as dependency.
+
+```toml
+[dependencies]
+apisdk = { version = "0.0.6" }
+```
+
+This crate has several features:
+- uuid
+    - use [`uuid`](https://crates.io/crates/uuid) instead of [`nanoid`](https://crates.io/crates/nanoid) to generate `X-Request-ID` and `X-Trace-ID`
+- dns
+    - install [`hickory-resolver`](https://crates.io/crates/hickory-resolver) (aka. [`trust-dns-resolver`](https://crates.io/crates/trust-dns-resolver)), and able to use it to do DNS queries
+
+### Define API struct
+
 To define a very simple API, we just need a few lines of code.
 
 ```rust
@@ -34,11 +53,12 @@ use apisdk::{http_api, send, ApiResult};
 #[derive(Debug, Clone)] // optional
 pub struct MyApi;
 
+// Response DTO
 #[derive(serde::Deserialize)]
 pub struct User {}
 
 impl MyApi {
-    // Declare a function for public use.
+    // Define a function for public use.
     // It should return ApiResult<T>, which is an alias for Result<T, ApiError>.
     pub async fn get_user(&self, user_id: u64) -> ApiResult<User> {
         // Initiate a GET request with the URL path, and wait for the endpoint to be resolved.
@@ -49,6 +69,8 @@ impl MyApi {
     }
 }
 ```
+
+### Call APIs
 
 To use the API, just follow these steps.
 
@@ -83,8 +105,10 @@ We can use `XxxApi::builder()` to get an instance of `ApiBuilder`, and call foll
 
 - `with_client`
     - set `reqwest::ClientBuilder` to customize Client
-- `with_router`
-    - rewrite host and port
+- `with_rewriter`
+    - rewrite HTTP Url
+- `with_resolver`
+    - custom DNS queries
 - `with_signature`
     - set credentials for each request
 - `with_initialiser` & `with_middleware`
@@ -98,11 +122,11 @@ For really simple APIs, we can use `XxxApi::default()` to replace `XxxApi::build
 
 ### create HTTP request
 
-Within the API instance, there are several functions thats help create HTTP requests. 
+The API instances provide a series of functions to assist in creating HTTP requests.
 
 - create with HTTP method
     - `async fn request(method: Method, path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
-- quick functions
+- convenience functions
     - `async fn head(path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
     - `async fn get(path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
     - `async fn post(path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
@@ -112,12 +136,12 @@ Within the API instance, there are several functions thats help create HTTP requ
     - `async fn options(path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
     - `async fn trace(path: impl AsRef<str>) -> ApiResult<RequestBuilder>`
 
-We can also access the `core` field of the API instance to access more low-level functionality.
+We can also use the `core` field of the API instance to access more low-level functionality.
 
 ```rust
 let api = XxxApi::default();
 let req = api.core  // an instance of apisdk::ApiCore
-    .rebase("http://different.host.com/api")
+    .rebase("http://different.host.com/api")  // reset the BaseUrl
     .build_request(Method::GET, "/path")?;
 ```
 
@@ -130,7 +154,7 @@ This crate re-export `RequestBuilder` from `reqwest-middleware`, and provides se
 - `TraceId`
     - set value of `X-Trace-ID` and/or `X-Span-ID`
 - `MockServer`
-    - mock the server response by using `serde_json::Value`
+    - mock the server response
 
 ### `send` macros
 
@@ -145,8 +169,10 @@ This crate re-export `RequestBuilder` from `reqwest-middleware`, and provides se
 - `send_multipart`
     - send request with multipart form
 
+These macros support following forms.
+
 ```rust
-// Form 1: send and parse JSON response to Data
+// Form 1: send and parse response as JSON / XML
 let _: Data = send!(req).await?;
 
 // Form 2: send, drop response and return ApiResult<()>
@@ -171,3 +197,4 @@ let _ = send!(req, Data).await?;
 let _ = send!(req, Json<Data>).await?;
 ```
 
+You may check `tests` for more examples.

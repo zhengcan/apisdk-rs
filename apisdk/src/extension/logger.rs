@@ -1,13 +1,26 @@
-use std::{collections::HashMap, str::FromStr, time::Instant};
+use std::{collections::HashMap, str::FromStr, sync::OnceLock, time::Instant};
 
 use async_trait::async_trait;
+use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
+use regex::Regex;
 use reqwest::{Request, Response};
 use reqwest_middleware::{Middleware, Next, RequestBuilder, RequestInitialiser};
 use serde_json::Value;
 use task_local_extensions::Extensions;
 
 use crate::ResponseBody;
+
+static DEFAULT_LOG_LEVEL: OnceLock<LevelFilter> = OnceLock::new();
+
+/// Set the log level as global default
+pub fn init_default_log_level(level: LevelFilter) -> Result<(), LevelFilter> {
+    DEFAULT_LOG_LEVEL.set(level)
+}
+
+pub(crate) fn get_default_log_level() -> LevelFilter {
+    *DEFAULT_LOG_LEVEL.get_or_init(|| LevelFilter::Debug)
+}
 
 /// This trait is used to create `LevelFilter`
 pub trait IntoFilter {
@@ -17,7 +30,7 @@ pub trait IntoFilter {
 impl IntoFilter for bool {
     fn into_filter(self) -> Option<LevelFilter> {
         if self {
-            Some(LevelFilter::Debug)
+            Some(get_default_log_level())
         } else {
             Some(LevelFilter::Off)
         }
@@ -53,7 +66,7 @@ pub struct LogConfig {
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            level: LevelFilter::Debug,
+            level: get_default_log_level(),
         }
     }
 }
@@ -65,7 +78,7 @@ impl LogConfig {
         L: IntoFilter,
     {
         Self {
-            level: level.into_filter().unwrap_or(LevelFilter::Debug),
+            level: level.into_filter().unwrap_or(get_default_log_level()),
         }
     }
 
@@ -124,7 +137,7 @@ enum RequestPayload {
 #[derive(Debug, Clone)]
 pub(crate) struct Logger {
     /// The target of log
-    log_target: &'static str,
+    log_target: String,
     /// The level of log
     log_level: Option<Level>,
     /// The X-Request-ID value
@@ -135,11 +148,15 @@ pub(crate) struct Logger {
     payload: Option<RequestPayload>,
 }
 
+lazy_static! {
+    static ref REGEX: Regex = Regex::new(r"<impl (.+::)*(.*)>").unwrap();
+}
+
 impl Logger {
     /// Create a new instance
     pub fn new(log_target: &'static str, log_filter: LevelFilter, request_id: String) -> Self {
         Self {
-            log_target,
+            log_target: REGEX.replace_all(log_target, "<$2>").to_string(),
             log_level: log_filter.to_level(),
             request_id,
             start: Instant::now(),
@@ -181,7 +198,7 @@ impl Logger {
     /// Log request
     pub fn log_request(&self, req: &Request) {
         if let Some(level) = self.log_level {
-            log::log!(target: self.log_target, level, "#[{}] {:?}", self.request_id, req);
+            log::log!(target: &self.log_target, level, "#[{}] {:?}", self.request_id, req);
             if let Some(payload) = self.payload.as_ref() {
                 self.log_request_payload(level, payload);
             }
@@ -191,16 +208,16 @@ impl Logger {
     fn log_request_payload(&self, level: Level, payload: &RequestPayload) {
         match payload {
             RequestPayload::Json(json) => {
-                log::log!(target: self.log_target, level, "#[{}] Request Json\n{}", self.request_id, json);
+                log::log!(target: &self.log_target, level, "#[{}] Request Json\n{}", self.request_id, json);
             }
             RequestPayload::Xml(xml) => {
-                log::log!(target: self.log_target, level, "#[{}] Request Xml\n{:?}", self.request_id, xml);
+                log::log!(target: &self.log_target, level, "#[{}] Request Xml\n{:?}", self.request_id, xml);
             }
             RequestPayload::Form(meta) => {
-                log::log!(target: self.log_target, level, "#[{}] Request Form\n{:?}", self.request_id, meta);
+                log::log!(target: &self.log_target, level, "#[{}] Request Form\n{:?}", self.request_id, meta);
             }
             RequestPayload::Multipart(meta) => {
-                log::log!(target: self.log_target, level, "#[{}] Request Multipart\n{:?}", self.request_id, meta);
+                log::log!(target: &self.log_target, level, "#[{}] Request Multipart\n{:?}", self.request_id, meta);
             }
         }
     }
@@ -209,7 +226,7 @@ impl Logger {
     pub fn log_response(&self, res: &Response) {
         if let Some(level) = self.log_level {
             log::log!(
-                target: self.log_target,
+                target: &self.log_target,
                 level,
                 "#[{}] {:?} @{}ms",
                 self.request_id,
@@ -223,7 +240,7 @@ impl Logger {
     pub fn log_response_json(&self, json: &Value) {
         if let Some(level) = self.log_level {
             log::log!(
-                target: self.log_target,
+                target: &self.log_target,
                 level,
                 "#[{}] Response Body(Json) @{}ms\n{}",
                 self.request_id,
@@ -237,7 +254,7 @@ impl Logger {
     pub fn log_response_xml(&self, xml: &str) {
         if let Some(level) = self.log_level {
             log::log!(
-                target: self.log_target,
+                target: &self.log_target,
                 level,
                 "#[{}] Response Body(Xml) @{}ms\n{}",
                 self.request_id,
@@ -251,7 +268,7 @@ impl Logger {
     pub fn log_response_text(&self, text: &str) {
         if let Some(level) = self.log_level {
             log::log!(
-                target: self.log_target,
+                target: &self.log_target,
                 level,
                 "#[{}] Response Body(Text) @{}ms\n{}",
                 self.request_id,
@@ -264,8 +281,8 @@ impl Logger {
     /// Log mock request and response
     pub fn log_mock_request_and_response(&self, req: &Request, mock_name: &str) {
         if let Some(level) = self.log_level {
-            log::log!(target: self.log_target, level, "#[{}] {:?}", self.request_id, req);
-            log::log!(target: self.log_target, level, "#[{}] Response (MOCK) <= {}", self.request_id, mock_name);
+            log::log!(target: &self.log_target, level, "#[{}] {:?}", self.request_id, req);
+            log::log!(target: &self.log_target, level, "#[{}] Response (MOCK) <= {}", self.request_id, mock_name);
         }
     }
 
@@ -282,7 +299,7 @@ impl Logger {
     pub fn log_error(&self, e: impl std::fmt::Display) {
         let level = self.log_level.unwrap_or(Level::Debug).min(Level::Warn);
         log::log!(
-            target: self.log_target,
+            target: &self.log_target,
             level,
             "#[{}] Error @{}ms: {}",
             self.request_id,

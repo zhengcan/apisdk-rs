@@ -1,0 +1,32 @@
+[package]
+name = "instagram-api"
+version = "0.0.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A Instagram Api for Rust (based on apisdk)"
+repository = "https://github.com/zhengcan/apisdk-rs"
+keywords = ["instagram", "api", "sdk", "reqwest", "restful"]
+publish = false
+
+[package.metadata.release]
+release = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+apisdk = { version = "0.0.7", path = "../../apisdk" }
+serde = { version = "1.0" }
+serde_json = { version = "1.0" }
+strum = { version = "0.25", features = ["derive"] }
+log = "0.4"
+anyhow = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-log = "0.2"
+tracing-subscriber = "0.3"
+
+[features]
+default = ["basic_display", "graph"]
+basic_display = []
+graph = []

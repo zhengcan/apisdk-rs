@@ -1,11 +1,9 @@
 mod auth;
-mod log;
-mod misc;
+mod logger;
 mod mock;
 mod trace;
 
 pub use auth::*;
-pub use log::*;
-pub(crate) use misc::*;
+pub use logger::*;
 pub use mock::*;
 pub use trace::*;

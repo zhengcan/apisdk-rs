@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
-use log::LevelFilter;
 use reqwest::{header::CONTENT_TYPE, Response, ResponseBuilderExt};
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::{
-    ApiError, ApiResult, FormLike, IntoFilter, LogConfig, Logger, MimeType, MockServer,
-    RequestBuilder, RequestId, RequestTraceIdMiddleware, Responder, ResponseBody,
+    get_default_log_level, ApiError, ApiResult, FormLike, IntoFilter, LogConfig, Logger, MimeType,
+    MockServer, RequestBuilder, RequestId, RequestTraceIdMiddleware, Responder, ResponseBody,
 };
 
 /// This struct is used to build RequestConfig internally by macros.
@@ -51,8 +50,8 @@ impl RequestConfigurator {
         let log_filter = extensions
             .get::<LogConfig>()
             .map(|config| config.level)
-            .or_else(|| self.log_filter)
-            .unwrap_or(LevelFilter::Debug);
+            .or(self.log_filter)
+            .unwrap_or(get_default_log_level());
 
         let request_id = extensions
             .get::<RequestId>()

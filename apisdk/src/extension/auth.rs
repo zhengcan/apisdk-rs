@@ -1,13 +1,19 @@
-use std::{any::type_name, sync::Arc, time::SystemTime};
+use std::{any::type_name, num::ParseIntError, string::FromUtf8Error, sync::Arc, time::SystemTime};
 
 use async_trait::async_trait;
+use base64::DecodeError;
 use reqwest::{
     header::{HeaderName, HeaderValue, AUTHORIZATION},
     Request, Response,
 };
 use reqwest_middleware::Next;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-use crate::{digest, Extensions, Middleware};
+use crate::{
+    digest::{self, decode_base64},
+    Extensions, Middleware,
+};
 
 /// This middleware is used to sign the request
 #[derive(Default)]
@@ -101,6 +107,9 @@ impl ApiSignature for Box<dyn ApiSignature> {
 
 /// This trait is used to update signature
 pub trait SignatureTrait {
+    /// Update signature to use `Carrier`
+    fn with_carrier(self, carrier: Carrier) -> Self;
+
     /// Update signature to use `Header`
     /// - name: the name of header
     fn with_header_name(self, name: impl ToString) -> Self;
@@ -111,9 +120,10 @@ pub trait SignatureTrait {
 }
 
 /// This enum represents the position of request to carry token.
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub enum Carrier {
     /// Standard `Authorization` header, with `Bearer` auth-scheme
+    #[default]
     BearerAuth,
     /// Standard `Authorization` header, without any auth-scheme
     SchemelessAuth,
@@ -121,12 +131,6 @@ pub enum Carrier {
     Header(String),
     /// Customized query param
     QueryParam(String),
-}
-
-impl Default for Carrier {
-    fn default() -> Self {
-        Self::BearerAuth
-    }
 }
 
 impl Carrier {
@@ -221,6 +225,10 @@ impl TokenProvider for AccessTokenSignature {
 }
 
 impl SignatureTrait for AccessTokenSignature {
+    fn with_carrier(self, carrier: Carrier) -> Self {
+        Self { carrier, ..self }
+    }
+
     fn with_header_name(self, name: impl ToString) -> Self {
         Self {
             carrier: Carrier::Header(name.to_string()),
@@ -282,6 +290,18 @@ impl From<&str> for HashAlgorithm {
 /// sign = hash($app_id + $app_secret + $timestamp)
 /// token = base64($client_id + "," + $app_id + "," + $timestamp + "," + $sign)
 ///       = (or) base64($app_id + "," + $timestamp + "," + $sign)
+/// ```
+///
+/// # Parse token
+///
+/// ```rust
+/// let token = "xxx";
+/// let parsed_token = ParsedHashedToken::parse(token)?;
+/// if parsed_token.is_expired(60 * 5, None) {
+///     // Expired Token
+/// } else if parsed_token.is_signed("my-secret-key", HashAlgorithm::MD5) {
+///     // Invalid Token
+/// }
 /// ```
 #[derive(Debug)]
 pub struct HashedTokenSignature {
@@ -363,6 +383,10 @@ impl TokenProvider for HashedTokenSignature {
 }
 
 impl SignatureTrait for HashedTokenSignature {
+    fn with_carrier(self, carrier: Carrier) -> Self {
+        Self { carrier, ..self }
+    }
+
     fn with_header_name(self, name: impl ToString) -> Self {
         Self {
             carrier: Carrier::Header(name.to_string()),
@@ -375,5 +399,116 @@ impl SignatureTrait for HashedTokenSignature {
             carrier: Carrier::QueryParam(name.to_string()),
             ..self
         }
+    }
+}
+
+/// Token Error
+#[derive(Debug, Error)]
+pub enum TokenError {
+    /// Base64 decode error
+    #[error("{0}")]
+    Base64(#[from] DecodeError),
+    /// Utf8 decode error
+    #[error("{0}")]
+    Utf8(#[from] FromUtf8Error),
+    /// Invalid format
+    #[error("Invalid format")]
+    Format,
+    /// Invalid timestamp
+    #[error("{0}")]
+    Timestamp(#[from] ParseIntError),
+}
+
+/// This struct is used to parse token
+#[derive(Debug)]
+pub struct ParsedHashedToken {
+    /// client_id
+    pub client_id: Option<String>,
+    /// app_id
+    pub app_id: String,
+    /// timestamp, in second
+    pub timestamp: u64,
+    /// sign
+    pub sign: String,
+}
+
+impl ParsedHashedToken {
+    /// Parse the token
+    pub fn parse(token: impl AsRef<[u8]>) -> Result<Self, TokenError> {
+        let token = token.as_ref();
+        if token.is_empty() {
+            return Err(TokenError::Format);
+        }
+
+        let composed = decode_base64(token)
+            .map_err(|e| TokenError::Base64(e))
+            .and_then(|b| String::from_utf8(b).map_err(|e| TokenError::Utf8(e)))?;
+        let terms: Vec<&str> = composed.split(',').collect();
+        let mut iter = terms.iter();
+        match terms.len() {
+            4 => Ok(Self {
+                client_id: Some(iter.next().unwrap().to_string()),
+                app_id: iter.next().unwrap().to_string(),
+                timestamp: iter
+                    .next()
+                    .unwrap()
+                    .parse()
+                    .map_err(|e| TokenError::Timestamp(e))?,
+                sign: iter.next().unwrap().to_string(),
+            }),
+            3 => Ok(Self {
+                client_id: None,
+                app_id: iter.next().unwrap().to_string(),
+                timestamp: iter
+                    .next()
+                    .unwrap()
+                    .parse()
+                    .map_err(|e| TokenError::Timestamp(e))?,
+                sign: iter.next().unwrap().to_string(),
+            }),
+            _ => Err(TokenError::Format),
+        }
+    }
+
+    /// Check the token is expired or not
+    /// - deviation: 1 min as default
+    pub fn is_expired(&self, expires_in_secs: u64, deviation: Option<u64>) -> bool {
+        let deviation = deviation.unwrap_or(60) as i64;
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let diff = now as i64 - self.timestamp as i64;
+        diff < -deviation || diff > expires_in_secs as i64 + deviation
+    }
+
+    /// Check the token is signed or not
+    pub fn is_signed<S, A>(&self, app_secret: S, algorithm: A) -> bool
+    where
+        S: std::fmt::Display,
+        A: Into<HashAlgorithm>,
+    {
+        // Sign
+        let plain = format!("{}{}{}", self.app_id, app_secret, self.timestamp);
+        let algorithm: HashAlgorithm = algorithm.into();
+        let sign = algorithm.apply(plain);
+
+        sign == self.sign
+    }
+}
+
+impl TryFrom<&str> for ParsedHashedToken {
+    type Error = TokenError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
+impl TryFrom<String> for ParsedHashedToken {
+    type Error = TokenError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::parse(value)
     }
 }
