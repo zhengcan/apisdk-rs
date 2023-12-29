@@ -1,4 +1,4 @@
-use base64::{engine::general_purpose, Engine};
+use base64::{engine::general_purpose, DecodeError, Engine};
 use md5::{Digest, Md5};
 use sha1::Sha1;
 use sha2::Sha256;
@@ -42,9 +42,14 @@ pub fn sha256(input: impl AsRef<[u8]>) -> String {
     hex::encode(sha256.finalize())
 }
 
-/// Calc base64
+/// Encode base64
 pub fn encode_base64(input: impl AsRef<[u8]>) -> String {
     general_purpose::STANDARD.encode(input)
+}
+
+/// Decode base64
+pub fn decode_base64(input: impl AsRef<[u8]>) -> Result<Vec<u8>, DecodeError> {
+    general_purpose::STANDARD.decode(input)
 }
 
 #[cfg(test)]
