@@ -28,7 +28,7 @@ pub(crate) fn build_builder(
 
         impl #name {
             /// Construct a new builder with base_url
-            fn new(base_url: impl apisdk::IntoUrl + std::fmt::Debug) -> Self {
+            pub fn new(base_url: impl apisdk::IntoUrl + std::fmt::Debug) -> Self {
                 Self {
                     inner: apisdk::ApiBuilder::new(base_url).expect("Invalid base_url"),
                 }
