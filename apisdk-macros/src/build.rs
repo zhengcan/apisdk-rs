@@ -20,11 +20,17 @@ pub(crate) fn build_builder(
             inner: apisdk::ApiBuilder,
         }
 
+        impl Default for #name {
+            fn default() -> Self {
+                Self::new(#base_url)
+            }
+        }
+
         impl #name {
             /// Construct a new builder with base_url
-            fn new() -> Self {
+            fn new(base_url: impl apisdk::IntoUrl + std::fmt::Debug) -> Self {
                 Self {
-                    inner: apisdk::ApiBuilder::new(#base_url).expect("Invalid base_url"),
+                    inner: apisdk::ApiBuilder::new(base_url).expect("Invalid base_url"),
                 }
             }
 
@@ -135,7 +141,7 @@ pub(crate) fn build_api_impl(
 
             /// Create an ApiBuilder
             pub fn builder() -> #builder_name {
-                #builder_name::new()
+                #builder_name::default()
             }
 
             /// Build request url
