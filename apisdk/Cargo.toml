@@ -4,6 +4,7 @@ version = "0.0.8-rc.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "An easy-to-use API toolkit for writing HTTP API Clients for Rust."
+categories = ["network-programming", "web-programming::http-client"]
 repository = "https://github.com/zhengcan/apisdk-rs"
 keywords = ["http", "restful", "reqwest", "api"]
 readme = "../README.md"

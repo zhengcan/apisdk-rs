@@ -32,7 +32,7 @@
 
 ```toml
 [dependencies]
-apisdk = { version = "0.0.7" }
+apisdk = { version = "0" }
 ```
 
 本 crate 包含以下特性：

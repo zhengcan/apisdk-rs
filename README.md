@@ -32,7 +32,7 @@ Update `Cargo.toml` to add this crate as dependency.
 
 ```toml
 [dependencies]
-apisdk = { version = "0.0.7" }
+apisdk = { version = "0" }
 ```
 
 This crate has several features:
