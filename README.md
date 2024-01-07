@@ -13,7 +13,7 @@ An easy-to-use API toolkit for writing HTTP API Clients for Rust.
 - Support `X-Request-ID` and `X-Trace-ID`/`X-Span-ID`
 - More customization capabilities
     - Provide `UrlRewriter` and `DnsResolver` to customize URL and API endpoint
-    - Set `Authorization` header by using `ApiSignature`
+    - Set `Authorization` header by using `ApiAuthenticator`
     - Provide middlewares by integrate [reqwest-middleware](https://github.com/TrueLayer/reqwest-middleware/)
     - Mock server response by using `MockServer`
 - [Changelog](CHANGELOG.md)
@@ -109,7 +109,7 @@ We can use `XxxApi::builder()` to get an instance of `ApiBuilder`, and call foll
     - rewrite HTTP Url
 - `with_resolver`
     - custom DNS queries
-- `with_signature`
+- `with_authenticator`
     - set credentials for each request
 - `with_initialiser` & `with_middleware`
     - support all `reqwest-middleware` components

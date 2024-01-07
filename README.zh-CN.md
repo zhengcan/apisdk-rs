@@ -13,7 +13,7 @@
 - 支持 `X-Request-ID` 和 `X-Trace-ID`/`X-Span-ID`
 - 更多自定义能力
     - 提供 `UrlRewriter` 和 `DnsResolver` 用于定制 URL 和 API 端点
-    - 可以使用 `ApiSignature` 设置 `Authorization` 鉴权头
+    - 可以使用 `ApiAuthenticator` 设置 `Authorization` 鉴权头
     - 通过集成 [reqwest-middleware](https://github.com/TrueLayer/reqwest-middleware/) 来提供中间件能力
     - 可以使用 `MockServer` 来提供仿冒服务器端响应
 - [变更日志](CHANGELOG.md)
@@ -107,7 +107,7 @@ async fn foo() -> ApiResult<()> {
     - 重写 HTTP Url
 - `with_resolver`
     - 自定义 DNS 查询
-- `with_signature`
+- `with_authenticator`
     - 为每个请求设置身份信息
 - `with_initialiser` & `with_middleware`
     - 支持所有 `reqwest-middleware` 组件
