@@ -1,6 +1,6 @@
 [package]
 name = "apisdk"
-version = "0.0.8-rc.1"
+version = "0.0.8"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "An easy-to-use API toolkit for writing HTTP API Clients for Rust."
@@ -15,7 +15,7 @@ readme = "../README.md"
 doctest = false
 
 [dependencies]
-apisdk-macros = { version = "0.0.8-rc.1", path = "../apisdk-macros" }
+apisdk-macros = { version = "0.0.8", path = "../apisdk-macros" }
 async-trait = "0.1"
 futures = "0.3"
 http = "1.0"
