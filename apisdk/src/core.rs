@@ -1,9 +1,10 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
-    ApiError, ApiResult, ApiSignature, Client, ClientBuilder, DnsResolver, Initialiser, IntoUrl,
-    LogConfig, LogMiddleware, Method, Middleware, RequestBuilder, RequestTraceIdMiddleware,
-    ReqwestDnsResolver, ReqwestUrlRewriter, SignatureMiddleware, Url, UrlOps, UrlRewriter,
+    ApiAuthenticator, ApiError, ApiResult, AuthenticateMiddleware, Client, ClientBuilder,
+    DnsResolver, Initialiser, IntoUrl, LogConfig, LogMiddleware, Method, Middleware,
+    RequestBuilder, RequestTraceIdMiddleware, ReqwestDnsResolver, ReqwestUrlRewriter, Url, UrlOps,
+    UrlRewriter,
 };
 
 /// This struct is used to build an instance of ApiCore
@@ -16,8 +17,8 @@ pub struct ApiBuilder {
     rewriter: Option<ReqwestUrlRewriter>,
     /// The holder of DnsResolver
     resolver: Option<ReqwestDnsResolver>,
-    /// The holder of ApiSignature
-    signature: Option<Arc<dyn ApiSignature>>,
+    /// The holder of ApiAuthenticator
+    authenticator: Option<Arc<dyn ApiAuthenticator>>,
     /// The holder of LogConfig
     logger: Option<Arc<LogConfig>>,
     /// The initialisers for Reqwest
@@ -35,7 +36,7 @@ impl ApiBuilder {
             base_url: base_url.into_url().map_err(ApiError::InvalidUrl)?,
             rewriter: None,
             resolver: None,
-            signature: None,
+            authenticator: None,
             logger: None,
             initialisers: vec![],
             middlewares: vec![],
@@ -72,14 +73,14 @@ impl ApiBuilder {
         }
     }
 
-    /// Set the ApiSignature
-    /// - signature: ApiSignature
-    pub fn with_signature<T>(self, signature: T) -> Self
+    /// Set the ApiAuthenticator
+    /// - authenticator: ApiAuthenticator
+    pub fn with_authenticator<T>(self, authenticator: T) -> Self
     where
-        T: ApiSignature,
+        T: ApiAuthenticator,
     {
         Self {
-            signature: Some(Arc::new(signature)),
+            authenticator: Some(Arc::new(authenticator)),
             ..self
         }
     }
@@ -132,8 +133,8 @@ impl ApiBuilder {
         for middleware in self.middlewares {
             client = client.with_arc(middleware);
         }
-        if self.signature.is_some() {
-            client = client.with(SignatureMiddleware);
+        if self.authenticator.is_some() {
+            client = client.with(AuthenticateMiddleware);
         }
         client = client.with(LogMiddleware);
 
@@ -150,7 +151,7 @@ impl ApiBuilder {
             base_url: self.base_url,
             rewriter: self.rewriter,
             resolver: self.resolver,
-            signature: self.signature,
+            authenticator: self.authenticator,
         }
     }
 }
@@ -165,8 +166,8 @@ pub struct ApiCore {
     rewriter: Option<ReqwestUrlRewriter>,
     /// The holder of ReqwestDnsResolver
     resolver: Option<ReqwestDnsResolver>,
-    /// The holder of ApiSignature
-    signature: Option<Arc<dyn ApiSignature>>,
+    /// The holder of ApiAuthenticator
+    authenticator: Option<Arc<dyn ApiAuthenticator>>,
 }
 
 impl std::fmt::Debug for ApiCore {
@@ -181,8 +182,8 @@ impl std::fmt::Debug for ApiCore {
         if let Some(r) = self.resolver.as_ref() {
             d = d.field("resolver", &r.type_name());
         }
-        if let Some(s) = self.signature.as_ref() {
-            d = d.field("signature", &s.type_name());
+        if let Some(s) = self.authenticator.as_ref() {
+            d = d.field("authenticator", &s.type_name());
         }
         d.finish()
     }
@@ -197,7 +198,7 @@ impl ApiCore {
             base_url,
             rewriter: self.rewriter.clone(),
             resolver: self.resolver.clone(),
-            signature: self.signature.clone(),
+            authenticator: self.authenticator.clone(),
         })
     }
 
@@ -212,7 +213,7 @@ impl ApiCore {
             base_url: self.base_url.clone(),
             rewriter: Some(ReqwestUrlRewriter::new(rewriter)),
             resolver: self.resolver.clone(),
-            signature: self.signature.clone(),
+            authenticator: self.authenticator.clone(),
         }
     }
 
@@ -227,7 +228,7 @@ impl ApiCore {
             base_url: self.base_url.clone(),
             rewriter: self.rewriter.clone(),
             resolver: Some(ReqwestDnsResolver::new(resolver)),
-            signature: self.signature.clone(),
+            authenticator: self.authenticator.clone(),
         }
     }
 
@@ -272,8 +273,8 @@ impl ApiCore {
         let url = self.build_url(path.as_ref()).await?;
         let req = self.client.request(method, url);
 
-        match self.signature.clone() {
-            Some(signature) => Ok(req.with_extension(signature)),
+        match self.authenticator.clone() {
+            Some(authenticator) => Ok(req.with_extension(authenticator)),
             None => Ok(req),
         }
     }

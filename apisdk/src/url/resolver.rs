@@ -55,6 +55,12 @@ impl<I: Into<IpAddr>> From<(I, u16)> for SocketAddrs {
     }
 }
 
+impl From<SocketAddr> for SocketAddrs {
+    fn from(value: SocketAddr) -> Self {
+        SocketAddrs::new_single(value)
+    }
+}
+
 /// This trait is used to performing DNS queries
 #[async_trait]
 pub trait DnsResolver: 'static + Send + Sync {
@@ -87,6 +93,13 @@ where
 impl DnsResolver for IpAddr {
     async fn resolve(&self, _name: &str) -> Option<SocketAddrs> {
         Some(SocketAddrs::from((*self, 0)))
+    }
+}
+
+#[async_trait]
+impl DnsResolver for SocketAddr {
+    async fn resolve(&self, _name: &str) -> Option<SocketAddrs> {
+        Some(SocketAddrs::from(self.clone()))
     }
 }
 

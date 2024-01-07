@@ -55,10 +55,10 @@ pub(crate) fn build_builder(
                 }
             }
 
-            /// Set ApiSignature
-            pub fn with_signature<T>(self, signature: T) -> Self where T: apisdk::ApiSignature {
+            /// Set ApiAuthenticator
+            pub fn with_authenticator<T>(self, authenticator: T) -> Self where T: apisdk::ApiAuthenticator {
                 Self {
-                    inner: self.inner.with_signature(signature)
+                    inner: self.inner.with_authenticator(authenticator)
                 }
             }
 

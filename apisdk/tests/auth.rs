@@ -1,6 +1,6 @@
 use apisdk::{
-    send, AccessTokenSignature, ApiResult, ApiSignature, Carrier, CodeDataMessage,
-    HashedTokenSignature, SignatureTrait, TokenProvider,
+    send, AccessTokenAuth, ApiAuthenticator, ApiResult, Carrier, CodeDataMessage, HashedTokenAuth,
+    TokenGenerator, WithCarrier,
 };
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine};
@@ -23,7 +23,7 @@ async fn test_access_token_auth_fixed() -> ApiResult<()> {
     start_server().await;
 
     let api = TheApi::builder()
-        .with_signature(AccessTokenSignature::new("fixed"))
+        .with_authenticator(AccessTokenAuth::new("fixed"))
         .build();
 
     let res = api.touch().await?;
@@ -40,7 +40,7 @@ async fn test_access_token_auth_dynamic() -> ApiResult<()> {
     start_server().await;
 
     let api = TheApi::builder()
-        .with_signature(AccessTokenSignature::new_dynamic(|| Ok("dynamic")))
+        .with_authenticator(AccessTokenAuth::new_dynamic(|| Ok("dynamic")))
         .build();
 
     let res = api.touch().await?;
@@ -57,7 +57,7 @@ async fn test_access_token_auth_in_header() -> ApiResult<()> {
     start_server().await;
 
     let api = TheApi::builder()
-        .with_signature(AccessTokenSignature::new("fixed").with_header_name("x-auth"))
+        .with_authenticator(AccessTokenAuth::new("fixed").with_header_name("x-auth"))
         .build();
 
     let res = api.touch().await?;
@@ -76,7 +76,7 @@ async fn test_access_token_auth_schemeless() -> ApiResult<()> {
     struct Schemeless {}
 
     #[async_trait]
-    impl TokenProvider for Schemeless {
+    impl TokenGenerator for Schemeless {
         async fn generate_token(
             &self,
             _req: &Request,
@@ -85,13 +85,13 @@ async fn test_access_token_auth_schemeless() -> ApiResult<()> {
         }
     }
     #[async_trait]
-    impl ApiSignature for Schemeless {
+    impl ApiAuthenticator for Schemeless {
         fn get_carrier(&self) -> &Carrier {
-            &Carrier::SchemelessAuth
+            &Carrier::SchemalessAuth
         }
     }
 
-    let api = TheApi::builder().with_signature(Schemeless {}).build();
+    let api = TheApi::builder().with_authenticator(Schemeless {}).build();
 
     let res = api.touch().await?;
     log::debug!("res = {:?}", res);
@@ -107,7 +107,7 @@ async fn test_access_token_auth_in_query() -> ApiResult<()> {
     start_server().await;
 
     let api = TheApi::builder()
-        .with_signature(AccessTokenSignature::new("fixed").with_query_param("x-auth"))
+        .with_authenticator(AccessTokenAuth::new("fixed").with_query_param("x-auth"))
         .build();
 
     let res = api.touch().await?;
@@ -124,7 +124,7 @@ async fn test_hashed_token_auth() -> ApiResult<()> {
     start_server().await;
 
     let api = TheApi::builder()
-        .with_signature(HashedTokenSignature::new("app_id", "app_secret"))
+        .with_authenticator(HashedTokenAuth::new("app_id", "app_secret"))
         .build();
 
     let res = api.touch().await?;

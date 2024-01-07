@@ -1,4 +1,8 @@
-use std::{any::type_name, net::SocketAddr, sync::Arc};
+use std::{
+    any::type_name,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 use url::Url;
@@ -20,6 +24,15 @@ where
 {
     async fn rewrite(&self, url: Url) -> Result<Url, ApiError> {
         self(url)
+    }
+}
+
+#[async_trait]
+impl UrlRewriter for IpAddr {
+    async fn rewrite(&self, url: Url) -> Result<Url, ApiError> {
+        let mut url = url;
+        let _ = url.set_ip_host(self.clone());
+        Ok(url)
     }
 }
 

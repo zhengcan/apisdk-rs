@@ -15,12 +15,12 @@ use crate::{
     Extensions, Middleware,
 };
 
-/// This middleware is used to sign the request
+/// This middleware is used to authenticate the request
 #[derive(Default)]
-pub(crate) struct SignatureMiddleware;
+pub(crate) struct AuthenticateMiddleware;
 
 #[async_trait]
-impl Middleware for SignatureMiddleware {
+impl Middleware for AuthenticateMiddleware {
     async fn handle(
         &self,
         req: Request,
@@ -29,9 +29,9 @@ impl Middleware for SignatureMiddleware {
     ) -> Result<Response, reqwest_middleware::Error> {
         let mut req = req;
 
-        // Sign the request by using ApiSignature
-        if let Some(signatue) = extensions.get::<Arc<dyn ApiSignature>>() {
-            req = signatue.sign(req, extensions).await?;
+        // Sign the request by using ApiAuthenticator
+        if let Some(signatue) = extensions.get::<Arc<dyn ApiAuthenticator>>() {
+            req = signatue.authenticate(req, extensions).await?;
         }
 
         next.run(req, extensions).await
@@ -40,13 +40,13 @@ impl Middleware for SignatureMiddleware {
 
 /// This trait is used to generate token
 #[async_trait]
-pub trait TokenProvider: 'static + Send + Sync {
+pub trait TokenGenerator: 'static + Send + Sync {
     /// Generate a new token
     async fn generate_token(&self, req: &Request) -> Result<String, reqwest_middleware::Error>;
 }
 
 #[async_trait]
-impl<F, T> TokenProvider for F
+impl<F, T> TokenGenerator for F
 where
     F: 'static + Send + Sync,
     F: Fn() -> Result<T, reqwest_middleware::Error>,
@@ -57,9 +57,9 @@ where
     }
 }
 
-/// This trait is used to sign request
+/// This trait is used to authenticate request
 #[async_trait]
-pub trait ApiSignature: TokenProvider {
+pub trait ApiAuthenticator: TokenGenerator {
     /// Get type_name, used in Debug
     fn type_name(&self) -> &str {
         type_name::<Self>()
@@ -70,10 +70,10 @@ pub trait ApiSignature: TokenProvider {
         &Carrier::BearerAuth
     }
 
-    /// Sign request
+    /// Authenticate request
     /// - req: HTTP request
     /// - extensions: Extensions
-    async fn sign(
+    async fn authenticate(
         &self,
         req: Request,
         _extensions: &Extensions,
@@ -84,37 +84,37 @@ pub trait ApiSignature: TokenProvider {
 }
 
 #[async_trait]
-impl TokenProvider for Box<dyn ApiSignature> {
+impl TokenGenerator for Box<dyn ApiAuthenticator> {
     async fn generate_token(&self, req: &Request) -> Result<String, reqwest_middleware::Error> {
         self.as_ref().generate_token(req).await
     }
 }
 
 #[async_trait]
-impl ApiSignature for Box<dyn ApiSignature> {
+impl ApiAuthenticator for Box<dyn ApiAuthenticator> {
     fn get_carrier(&self) -> &Carrier {
         self.as_ref().get_carrier()
     }
 
-    async fn sign(
+    async fn authenticate(
         &self,
         req: Request,
         extensions: &Extensions,
     ) -> Result<Request, reqwest_middleware::Error> {
-        self.as_ref().sign(req, extensions).await
+        self.as_ref().authenticate(req, extensions).await
     }
 }
 
-/// This trait is used to update signature
-pub trait SignatureTrait {
-    /// Update signature to use `Carrier`
+/// This trait is used to update carrier
+pub trait WithCarrier {
+    /// Update instance to use `Carrier`
     fn with_carrier(self, carrier: Carrier) -> Self;
 
-    /// Update signature to use `Header`
+    /// Update instance to use `Header`
     /// - name: the name of header
     fn with_header_name(self, name: impl ToString) -> Self;
 
-    /// Update signature to use `QueryParam`
+    /// Update instance to use `QueryParam`
     /// - name: the name of query param
     fn with_query_param(self, name: impl ToString) -> Self;
 }
@@ -126,7 +126,7 @@ pub enum Carrier {
     #[default]
     BearerAuth,
     /// Standard `Authorization` header, without any auth-scheme
-    SchemelessAuth,
+    SchemalessAuth,
     /// Customized header
     Header(String),
     /// Customized query param
@@ -145,7 +145,7 @@ impl Carrier {
                     HeaderValue::try_from(format!("Bearer {}", token)).unwrap(),
                 );
             }
-            Carrier::SchemelessAuth => {
+            Carrier::SchemalessAuth => {
                 req.headers_mut()
                     .insert(AUTHORIZATION, HeaderValue::try_from(token).unwrap());
             }
@@ -170,7 +170,7 @@ pub enum AccessToken {
     /// Immutable token
     Fixed(String),
     /// Dynamic token, which will be retrieved from provider
-    Dynamic(Arc<dyn TokenProvider>),
+    Dynamic(Arc<dyn TokenGenerator>),
 }
 
 impl std::fmt::Debug for AccessToken {
@@ -184,12 +184,12 @@ impl std::fmt::Debug for AccessToken {
 
 /// This struct is used to sign request by using `access_token`
 #[derive(Debug)]
-pub struct AccessTokenSignature {
+pub struct AccessTokenAuth {
     access_token: AccessToken,
     carrier: Carrier,
 }
 
-impl AccessTokenSignature {
+impl AccessTokenAuth {
     /// Build for immutable token
     pub fn new(access_token: impl ToString) -> Self {
         Self {
@@ -199,7 +199,7 @@ impl AccessTokenSignature {
     }
 
     /// Build for dynamic token
-    pub fn new_dynamic(provider: impl TokenProvider) -> Self {
+    pub fn new_dynamic(provider: impl TokenGenerator) -> Self {
         Self {
             access_token: AccessToken::Dynamic(Arc::new(provider)),
             carrier: Carrier::default(),
@@ -208,14 +208,14 @@ impl AccessTokenSignature {
 }
 
 #[async_trait]
-impl ApiSignature for AccessTokenSignature {
+impl ApiAuthenticator for AccessTokenAuth {
     fn get_carrier(&self) -> &Carrier {
         &self.carrier
     }
 }
 
 #[async_trait]
-impl TokenProvider for AccessTokenSignature {
+impl TokenGenerator for AccessTokenAuth {
     async fn generate_token(&self, req: &Request) -> Result<String, reqwest_middleware::Error> {
         match &self.access_token {
             AccessToken::Fixed(token) => Ok(token.clone()),
@@ -224,7 +224,7 @@ impl TokenProvider for AccessTokenSignature {
     }
 }
 
-impl SignatureTrait for AccessTokenSignature {
+impl WithCarrier for AccessTokenAuth {
     fn with_carrier(self, carrier: Carrier) -> Self {
         Self { carrier, ..self }
     }
@@ -304,7 +304,7 @@ impl From<&str> for HashAlgorithm {
 /// }
 /// ```
 #[derive(Debug)]
-pub struct HashedTokenSignature {
+pub struct HashedTokenAuth {
     client_id: Option<String>,
     app_id: String,
     app_secret: String,
@@ -312,7 +312,7 @@ pub struct HashedTokenSignature {
     carrier: Carrier,
 }
 
-impl HashedTokenSignature {
+impl HashedTokenAuth {
     pub fn new<S: ToString>(app_id: S, app_secret: S) -> Self {
         Self::new_with_algorithm(app_id, app_secret, HashAlgorithm::Sha1)
     }
@@ -365,14 +365,14 @@ impl HashedTokenSignature {
 }
 
 #[async_trait]
-impl ApiSignature for HashedTokenSignature {
+impl ApiAuthenticator for HashedTokenAuth {
     fn get_carrier(&self) -> &Carrier {
         &self.carrier
     }
 }
 
 #[async_trait]
-impl TokenProvider for HashedTokenSignature {
+impl TokenGenerator for HashedTokenAuth {
     async fn generate_token(&self, _req: &Request) -> Result<String, reqwest_middleware::Error> {
         let timestamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -382,7 +382,7 @@ impl TokenProvider for HashedTokenSignature {
     }
 }
 
-impl SignatureTrait for HashedTokenSignature {
+impl WithCarrier for HashedTokenAuth {
     fn with_carrier(self, carrier: Carrier) -> Self {
         Self { carrier, ..self }
     }
