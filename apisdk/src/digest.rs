@@ -16,7 +16,7 @@ pub fn md5_raw(input: impl AsRef<[u8]>) -> impl AsRef<[u8]> {
 }
 
 /// Calc md5 digest, and encode via base64
-pub fn md5_base64(input: impl AsRef<[u8]>) -> impl AsRef<[u8]> {
+pub fn md5_base64(input: impl AsRef<[u8]>) -> String {
     encode_base64(md5_raw(input))
 }
 
@@ -42,7 +42,7 @@ pub fn sha1_raw(input: impl AsRef<[u8]>) -> impl AsRef<[u8]> {
 }
 
 /// Calc sha1 digest, and encode via base64
-pub fn sha1_base(input: impl AsRef<[u8]>) -> String {
+pub fn sha1_base64(input: impl AsRef<[u8]>) -> String {
     encode_base64(sha1_raw(input))
 }
 
