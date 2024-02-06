@@ -241,6 +241,21 @@ impl ApiCore {
         self.with_rewriter(endpoint.into())
     }
 
+    /// Set the Authenticator
+    /// - authenticator: ApiAuthenticator
+    pub fn with_authenticator<T>(&self, authenticator: T) -> Self
+    where
+        T: ApiAuthenticator,
+    {
+        Self {
+            client: self.client.clone(),
+            base_url: self.base_url.clone(),
+            rewriter: self.rewriter.clone(),
+            resolver: self.resolver.clone(),
+            authenticator: Some(Arc::new(authenticator)),
+        }
+    }
+
     /// Build base_url
     async fn build_base_url(&self) -> Result<Url, ApiError> {
         let mut base_url = self.base_url.clone();
