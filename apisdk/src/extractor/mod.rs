@@ -67,7 +67,7 @@ impl From<MimeType> for HeaderValue {
 }
 
 /// This enum represents the payload of respones
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ResponseBody {
     /// Json (content-type = application/json)
     Json(Value),
@@ -87,7 +87,7 @@ impl ResponseBody {
         }
     }
 
-    /// Parse json to target type
+    /// Parse as json to target type
     pub fn parse_json<T>(self) -> ApiResult<T>
     where
         T: DeserializeOwned,
@@ -101,7 +101,7 @@ impl ResponseBody {
         }
     }
 
-    /// Parse json to target type
+    /// Parse as xml to target type
     pub fn parse_xml<T>(self) -> ApiResult<T>
     where
         T: DeserializeOwned,

@@ -16,11 +16,10 @@ impl Xml {
     {
         let type_id = TypeId::of::<T>();
         if type_id == TypeId::of::<()>() {
-            serde_json::from_value(Value::Null)
-                .map_err(|_| ApiError::Other("Impossible".to_string()))
+            serde_json::from_value(Value::Null).map_err(|_| ApiError::Impossible)
         } else if type_id == TypeId::of::<String>() {
             let value = serde_json::Value::String(text);
-            serde_json::from_value(value).map_err(|_| ApiError::Other("Impossible".to_string()))
+            serde_json::from_value(value).map_err(|_| ApiError::Impossible)
         } else {
             quick_xml::de::from_str(&text).map_err(ApiError::DecodeXml)
         }
@@ -33,8 +32,7 @@ impl Xml {
     {
         let type_id = TypeId::of::<T>();
         if type_id == TypeId::of::<()>() {
-            return serde_json::from_value(Value::Null)
-                .map_err(|_| ApiError::Other("Impossible".to_string()));
+            return serde_json::from_value(Value::Null).map_err(|_| ApiError::Impossible);
         }
 
         match body {

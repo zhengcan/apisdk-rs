@@ -59,6 +59,9 @@ pub enum ApiError {
     /// Other error
     #[error("Other error: {0}")]
     Other(String),
+    /// Impossible
+    #[error("It's impossible here.")]
+    Impossible,
 }
 
 impl ApiError {
@@ -86,7 +89,7 @@ impl ApiError {
             | Self::DecodeText
             | Self::IllegalJson(..) => 500,
             Self::ServiceError(c, _) => *c as i32,
-            Self::Other(..) => 500,
+            Self::Other(..) | Self::Impossible => 500,
         }
     }
 }
