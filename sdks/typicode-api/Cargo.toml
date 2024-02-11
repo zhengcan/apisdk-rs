@@ -13,7 +13,7 @@ release = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-apisdk = { version = "0.0.11", path = "../../apisdk" }
+apisdk = { version = "0.0.12", path = "../../apisdk" }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0" }
 serde_json = { version = "1.0" }
