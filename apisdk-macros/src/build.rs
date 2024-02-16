@@ -49,6 +49,7 @@ pub(crate) fn build_builder(
             }
 
             /// Set DnsResolver
+            #[cfg(not(target_arch = "wasm32"))]
             pub fn with_resolver<T>(self, resolver: T) -> Self where T: apisdk::DnsResolver {
                 Self {
                     inner: self.inner.with_resolver(resolver)

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use reqwest::{header::CONTENT_TYPE, Response, ResponseBuilderExt};
+#[cfg(not(target_arch = "wasm32"))]
+use reqwest::ResponseBuilderExt;
+use reqwest::{header::CONTENT_TYPE, Response};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -213,10 +215,15 @@ pub async fn send_raw(mut req: RequestBuilder, config: RequestConfigurator) -> A
 /// Send request, and return unparsed response
 /// - req: the request to send
 /// - logger: helper to log messages
-async fn send_and_unparse(mut req: RequestBuilder, logger: Logger) -> ApiResult<Response> {
+async fn send_and_unparse(
+    mut req: RequestBuilder,
+    #[allow(unused)] logger: Logger,
+) -> ApiResult<Response> {
+    #[allow(unused)]
     let extensions = req.extensions();
 
     // Mock
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(mock) = extensions.get::<MockServer>().cloned() {
         let req = req.build().map_err(ApiError::BuildRequest)?;
         logger.log_mock_request_and_response(&req, mock.type_name());
@@ -229,7 +236,7 @@ async fn send_and_unparse(mut req: RequestBuilder, logger: Logger) -> ApiResult<
                     ResponseBody::Xml(xml) => (MimeType::Xml, xml),
                     ResponseBody::Text(text) => (MimeType::Text, text),
                 };
-                let res = hyper::Response::builder()
+                let res = http::Response::builder()
                     .url(url)
                     .header(CONTENT_TYPE, content_type.to_string())
                     .body(text)

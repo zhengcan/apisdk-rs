@@ -25,6 +25,7 @@ pub use async_trait::async_trait;
 pub use serde_json;
 
 // Re-export reqwest types
+#[cfg(not(target_arch = "wasm32"))]
 pub use reqwest::dns;
 pub use reqwest::header;
 pub use reqwest::multipart;

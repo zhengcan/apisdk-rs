@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use apisdk::ApiResult;
 use apisdk_macros::http_api;
 use common::init_logger;

@@ -3,6 +3,8 @@ use reqwest::{header::HeaderValue, Request, Response};
 use reqwest_middleware::{Middleware, Next, RequestBuilder};
 use task_local_extensions::Extensions;
 
+use crate::MiddlewareError;
+
 /// Generate a new id for `X-Request-ID` or `X-Trace-ID`
 #[cfg(not(feature = "uuid"))]
 fn generate_id() -> String {
@@ -140,14 +142,15 @@ impl RequestTraceIdMiddleware {
 }
 
 /// Using `Middleware`, the injector will set request headers
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl Middleware for RequestTraceIdMiddleware {
     async fn handle(
         &self,
         req: Request,
         extensions: &mut Extensions,
         next: Next<'_>,
-    ) -> Result<Response, reqwest_middleware::Error> {
+    ) -> Result<Response, MiddlewareError> {
         let req = Self::inject_header(req, extensions);
         next.run(req, extensions).await
     }

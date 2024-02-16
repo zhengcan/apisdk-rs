@@ -1,15 +1,17 @@
 use url::Url;
 
+#[cfg(not(target_arch = "wasm32"))]
 mod resolver;
-mod rewriter;
-
+#[cfg(not(target_arch = "wasm32"))]
 pub use resolver::*;
+
+mod rewriter;
 pub use rewriter::*;
 
-#[cfg(feature = "dns")]
+#[cfg(all(not(target_arch = "wasm32"), feature = "hickory"))]
 mod hickory;
 
-#[cfg(feature = "dns")]
+#[cfg(all(not(target_arch = "wasm32"), feature = "hickory"))]
 pub use hickory::*;
 
 /// This trait provides URL related functions

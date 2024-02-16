@@ -1,4 +1,4 @@
-use hyper::header::HeaderValue;
+use http::header::HeaderValue;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 

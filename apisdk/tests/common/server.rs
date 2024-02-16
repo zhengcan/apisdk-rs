@@ -13,27 +13,6 @@ use warp::{
 
 pub const PORT: u16 = 3030;
 
-#[derive(Debug, Deserialize)]
-pub struct Payload<H = HashMap<String, String>> {
-    pub path: String,
-    pub headers: H,
-    #[serde(default)]
-    pub query: HashMap<String, String>,
-    #[serde(default)]
-    pub form: HashMap<String, String>,
-}
-
-impl<H> TryFrom<ResponseBody> for Payload<H>
-where
-    H: DeserializeOwned,
-{
-    type Error = ApiError;
-
-    fn try_from(body: ResponseBody) -> Result<Self, Self::Error> {
-        body.parse_json()
-    }
-}
-
 static ONCE: OnceCell<()> = OnceCell::const_new();
 
 pub async fn start_server() {

@@ -2,10 +2,12 @@ use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
     ApiAuthenticator, ApiError, ApiResult, AuthenticateMiddleware, Client, ClientBuilder,
-    DnsResolver, Initialiser, IntoUrl, LogConfig, LogMiddleware, Method, Middleware,
-    RequestBuilder, RequestTraceIdMiddleware, ReqwestDnsResolver, ReqwestUrlRewriter, Url, UrlOps,
-    UrlRewriter,
+    Initialiser, IntoUrl, LogConfig, LogMiddleware, Method, Middleware, RequestBuilder,
+    RequestTraceIdMiddleware, ReqwestUrlRewriter, Url, UrlOps, UrlRewriter,
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+use crate::{DnsResolver, ReqwestDnsResolver};
 
 /// This struct is used to build an instance of ApiCore
 pub struct ApiBuilder {
@@ -16,6 +18,7 @@ pub struct ApiBuilder {
     /// The holder of UrlRewriter
     rewriter: Option<ReqwestUrlRewriter>,
     /// The holder of DnsResolver
+    #[cfg(not(target_arch = "wasm32"))]
     resolver: Option<ReqwestDnsResolver>,
     /// The holder of ApiAuthenticator
     authenticator: Option<Arc<dyn ApiAuthenticator>>,
@@ -35,6 +38,7 @@ impl ApiBuilder {
             client: ClientBuilder::default(),
             base_url: base_url.into_url().map_err(ApiError::InvalidUrl)?,
             rewriter: None,
+            #[cfg(not(target_arch = "wasm32"))]
             resolver: None,
             authenticator: None,
             logger: None,
@@ -50,7 +54,7 @@ impl ApiBuilder {
     }
 
     /// Set the UrlRewriter
-    /// - resolver: UrlRewriter
+    /// - rewriter: UrlRewriter
     pub fn with_rewriter<T>(self, rewriter: T) -> Self
     where
         T: UrlRewriter,
@@ -63,6 +67,7 @@ impl ApiBuilder {
 
     /// Set the DnsResolver
     /// - resolver: DnsResolver
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn with_resolver<T>(self, resolver: T) -> Self
     where
         T: DnsResolver,
@@ -121,10 +126,13 @@ impl ApiBuilder {
 
     /// Build an instance of ApiCore
     pub fn build(self) -> ApiCore {
+        #[cfg(not(target_arch = "wasm32"))]
         let client = match self.resolver.clone() {
             Some(r) => self.client.dns_resolver(Arc::new(r)),
             None => self.client,
         };
+        #[cfg(target_arch = "wasm32")]
+        let client = self.client;
         let mut client = reqwest_middleware::ClientBuilder::new(client.build().unwrap());
 
         // Apply middleware in correct order
@@ -150,6 +158,7 @@ impl ApiBuilder {
             client: client.build(),
             base_url: self.base_url,
             rewriter: self.rewriter,
+            #[cfg(not(target_arch = "wasm32"))]
             resolver: self.resolver,
             authenticator: self.authenticator,
         }
@@ -165,6 +174,7 @@ pub struct ApiCore {
     /// The holder of ReqwestUrlRewriter
     rewriter: Option<ReqwestUrlRewriter>,
     /// The holder of ReqwestDnsResolver
+    #[cfg(not(target_arch = "wasm32"))]
     resolver: Option<ReqwestDnsResolver>,
     /// The holder of ApiAuthenticator
     authenticator: Option<Arc<dyn ApiAuthenticator>>,
@@ -179,6 +189,7 @@ impl std::fmt::Debug for ApiCore {
         if let Some(r) = self.rewriter.as_ref() {
             d = d.field("rewriter", &r.type_name());
         }
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(r) = self.resolver.as_ref() {
             d = d.field("resolver", &r.type_name());
         }
@@ -197,13 +208,14 @@ impl ApiCore {
             client: self.client.clone(),
             base_url,
             rewriter: self.rewriter.clone(),
+            #[cfg(not(target_arch = "wasm32"))]
             resolver: self.resolver.clone(),
             authenticator: self.authenticator.clone(),
         })
     }
 
     /// Set the UrlRewriter
-    /// - resolver: UrlRewriter
+    /// - rewriter: UrlRewriter
     pub fn with_rewriter<T>(&self, rewriter: T) -> Self
     where
         T: UrlRewriter,
@@ -212,6 +224,7 @@ impl ApiCore {
             client: self.client.clone(),
             base_url: self.base_url.clone(),
             rewriter: Some(ReqwestUrlRewriter::new(rewriter)),
+            #[cfg(not(target_arch = "wasm32"))]
             resolver: self.resolver.clone(),
             authenticator: self.authenticator.clone(),
         }
@@ -219,6 +232,7 @@ impl ApiCore {
 
     /// Set the DnsResolver
     /// - resolver: DnsResolver
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn with_resolver<T>(&self, resolver: T) -> Self
     where
         T: DnsResolver,
@@ -251,6 +265,7 @@ impl ApiCore {
             client: self.client.clone(),
             base_url: self.base_url.clone(),
             rewriter: self.rewriter.clone(),
+            #[cfg(not(target_arch = "wasm32"))]
             resolver: self.resolver.clone(),
             authenticator: Some(Arc::new(authenticator)),
         }
@@ -262,6 +277,7 @@ impl ApiCore {
         if let Some(router) = self.rewriter.as_ref() {
             base_url = router.rewrite(base_url).await?;
         }
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(resolver) = self.resolver.as_ref() {
             base_url = resolver.rewrite(base_url).await?;
         }

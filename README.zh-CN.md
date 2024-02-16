@@ -16,6 +16,7 @@
     - 可以使用 `ApiAuthenticator` 设置 `Authorization` 鉴权头
     - 通过集成 [reqwest-middleware](https://github.com/TrueLayer/reqwest-middleware/) 来提供中间件能力
     - 可以使用 `MockServer` 来提供仿冒服务器端响应
+- 支持 WASM
 - [变更日志](CHANGELOG.md)
 
 # 开发动机

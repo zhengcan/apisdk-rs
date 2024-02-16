@@ -99,7 +99,7 @@ impl DnsResolver for IpAddr {
 #[async_trait]
 impl DnsResolver for SocketAddr {
     async fn resolve(&self, _name: &str) -> Option<SocketAddrs> {
-        Some(SocketAddrs::from(self.clone()))
+        Some(SocketAddrs::from(*self))
     }
 }
 

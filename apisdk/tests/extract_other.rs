@@ -8,17 +8,17 @@ mod common;
 impl TheApi {
     async fn touch_as_json(&self) -> ApiResult<Value> {
         let req = self.get("/path/json").await?;
-        send!(req).await
+        send!(req, Body).await
     }
 
     async fn touch_as_string(&self) -> ApiResult<String> {
         let req = self.get("/path/json").await?;
-        send!(req).await
+        send!(req, Body).await
     }
 
     async fn touch_as_cdm(&self) -> ApiResult<CodeDataMessage> {
         let req = self.get("/path/json").await?;
-        send!(req).await
+        send!(req, Body).await
     }
 
     async fn touch_unit(&self) -> ApiResult<()> {

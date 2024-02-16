@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use apisdk::{send, ApiResult, CodeDataMessage};
+use apisdk::{send, ApiResult, CodeDataMessage, MiddlewareError};
 use reqwest::{Request, Response};
 use reqwest_tracing::{
     default_on_request_end, reqwest_otel_span, ReqwestOtelSpanBackend, TracingMiddleware,
@@ -33,7 +33,7 @@ impl ReqwestOtelSpanBackend for TimeTrace {
 
     fn on_request_end(
         span: &Span,
-        outcome: &Result<Response, reqwest_middleware::Error>,
+        outcome: &Result<Response, MiddlewareError>,
         extension: &mut Extensions,
     ) {
         let time_elapsed = extension.get::<Instant>().unwrap().elapsed().as_millis() as i64;

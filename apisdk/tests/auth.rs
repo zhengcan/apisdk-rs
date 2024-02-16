@@ -1,6 +1,6 @@
 use apisdk::{
     send, AccessTokenAuth, ApiAuthenticator, ApiResult, Carrier, CodeDataMessage, HashedTokenAuth,
-    TokenGenerator, WithCarrier,
+    MiddlewareError, TokenGenerator, WithCarrier,
 };
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine};
@@ -77,10 +77,7 @@ async fn test_access_token_auth_schemeless() -> ApiResult<()> {
 
     #[async_trait]
     impl TokenGenerator for Schemeless {
-        async fn generate_token(
-            &self,
-            _req: &Request,
-        ) -> Result<String, reqwest_middleware::Error> {
+        async fn generate_token(&self, _req: &Request) -> Result<String, MiddlewareError> {
             Ok("token".to_string())
         }
     }

@@ -16,6 +16,7 @@ An easy-to-use API toolkit for writing HTTP API Clients for Rust.
     - Set `Authorization` header by using `ApiAuthenticator`
     - Provide middlewares by integrate [reqwest-middleware](https://github.com/TrueLayer/reqwest-middleware/)
     - Mock server response by using `MockServer`
+- Support WASM
 - [Changelog](CHANGELOG.md)
 
 # Motivation

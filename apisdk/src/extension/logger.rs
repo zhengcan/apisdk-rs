@@ -9,7 +9,7 @@ use reqwest_middleware::{Middleware, Next, RequestBuilder, RequestInitialiser};
 use serde_json::Value;
 use task_local_extensions::Extensions;
 
-use crate::ResponseBody;
+use crate::{MiddlewareError, ResponseBody};
 
 static DEFAULT_LOG_LEVEL: OnceLock<LevelFilter> = OnceLock::new();
 
@@ -104,14 +104,15 @@ impl RequestInitialiser for LogConfig {
 /// This middleware is used to write logs
 pub(crate) struct LogMiddleware;
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl Middleware for LogMiddleware {
     async fn handle(
         &self,
         req: Request,
         extensions: &mut Extensions,
         next: Next<'_>,
-    ) -> Result<Response, reqwest_middleware::Error> {
+    ) -> Result<Response, MiddlewareError> {
         match extensions.remove::<Logger>() {
             Some(logger) => {
                 logger.log_request(&req);
