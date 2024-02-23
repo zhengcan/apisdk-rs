@@ -24,6 +24,9 @@ pub use async_trait::async_trait;
 /// Re-export serde_json
 pub use serde_json;
 
+/// Re-export quick_xml
+pub use quick_xml;
+
 // Re-export reqwest types
 pub use reqwest::dns;
 pub use reqwest::header;
@@ -41,6 +44,7 @@ pub use reqwest_middleware::ClientWithMiddleware as Client;
 /// Re-export from reqwest_middleware::Error.
 pub use reqwest_middleware::Error as MiddlewareError;
 pub use reqwest_middleware::Middleware;
+pub use reqwest_middleware::Next;
 pub use reqwest_middleware::RequestBuilder;
 /// Re-export from reqwest_middleware::RequestInitialiser.
 pub use reqwest_middleware::RequestInitialiser as Initialiser;
