@@ -39,18 +39,15 @@ pub use reqwest::Response;
 pub use reqwest::Url;
 
 // Re-export reqwest_middleware types
-/// Re-export from reqwest_middleware::ClientWithMiddleware.
 pub use reqwest_middleware::ClientWithMiddleware as Client;
-/// Re-export from reqwest_middleware::Error.
 pub use reqwest_middleware::Error as MiddlewareError;
 pub use reqwest_middleware::Middleware;
 pub use reqwest_middleware::Next;
 pub use reqwest_middleware::RequestBuilder;
-/// Re-export from reqwest_middleware::RequestInitialiser.
 pub use reqwest_middleware::RequestInitialiser as Initialiser;
 
-// Re-export task_local_extensions types
-pub use task_local_extensions::Extensions;
+// Re-export http types
+pub use http::Extensions;
 
 /// Re-export log::LevelFilter
 pub use log::LevelFilter;

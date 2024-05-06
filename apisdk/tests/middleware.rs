@@ -1,11 +1,11 @@
 use std::time::Instant;
 
 use apisdk::{send, ApiResult, CodeDataMessage};
+use http::Extensions;
 use reqwest::{Request, Response};
 use reqwest_tracing::{
     default_on_request_end, reqwest_otel_span, ReqwestOtelSpanBackend, TracingMiddleware,
 };
-use task_local_extensions::Extensions;
 use tracing::Span;
 
 use crate::common::{init_logger, start_server, Payload, TheApi};

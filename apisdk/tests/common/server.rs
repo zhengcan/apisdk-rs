@@ -1,12 +1,13 @@
 use std::{collections::HashMap, time::Duration};
 
-use apisdk::{header::HeaderMap, ApiError, ResponseBody};
+use apisdk::{ApiError, ResponseBody};
 use futures::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use tokio::sync::OnceCell;
 use warp::{
     filters::{multipart::FormData, path::FullPath},
+    http::HeaderMap,
     reply::Reply,
     Filter,
 };

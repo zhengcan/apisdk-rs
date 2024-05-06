@@ -2,6 +2,7 @@ use std::{any::type_name, num::ParseIntError, string::FromUtf8Error, sync::Arc, 
 
 use async_trait::async_trait;
 use base64::DecodeError;
+use http::Extensions;
 use reqwest::{
     header::{HeaderName, HeaderValue, AUTHORIZATION},
     Request, Response,
@@ -12,7 +13,7 @@ use thiserror::Error;
 
 use crate::{
     digest::{self, decode_base64},
-    Extensions, Middleware,
+    Middleware,
 };
 
 /// This middleware is used to authenticate the request

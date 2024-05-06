@@ -1,7 +1,7 @@
 use async_trait::async_trait;
+use http::Extensions;
 use reqwest::{header::HeaderValue, Request, Response};
 use reqwest_middleware::{Middleware, Next, RequestBuilder};
-use task_local_extensions::Extensions;
 
 /// Generate a new id for `X-Request-ID` or `X-Trace-ID`
 #[cfg(not(feature = "uuid"))]

@@ -1,16 +1,15 @@
 use std::{
     any::type_name,
     net::{IpAddr, SocketAddr},
+    str::FromStr,
     sync::Arc,
 };
 
 use async_trait::async_trait;
 use futures::FutureExt;
-use hyper::{
-    client::connect::dns::{GaiResolver, Name},
-    service::Service,
-};
-use reqwest::dns::{Addrs, Resolve, Resolving};
+use hyper_util::client::legacy::connect::dns::{GaiResolver, Name as HyperName};
+use reqwest::dns::{Addrs, Name, Resolve, Resolving};
+use tower_service::Service;
 use url::Url;
 
 use crate::{ApiError, UrlRewriter};
@@ -132,12 +131,21 @@ struct FallbackResolver(GaiResolver);
 
 impl Resolve for FallbackResolver {
     fn resolve(&self, name: Name) -> Resolving {
+        // let this = &mut self.0.clone();
+        // Box::pin(Service::<Name>::call(this, name).map(|result| {
+        //     result
+        //         .map(|addrs| -> Addrs { Box::new(addrs) })
+        //         .map_err(|err| -> BoxError { Box::new(err) })
+        // }))
         let this = &mut self.0.clone();
-        Box::pin(Service::<Name>::call(this, name).map(|result| {
-            result
-                .map(|addrs| -> Addrs { Box::new(addrs) })
-                .map_err(|err| -> BoxError { Box::new(err) })
-        }))
+        Box::pin(
+            this.call(HyperName::from_str(name.as_str()).unwrap())
+                .map(|result| {
+                    result
+                        .map(|addrs| -> Addrs { Box::new(addrs) })
+                        .map_err(|err| -> BoxError { Box::new(err) })
+                }),
+        )
     }
 }
 

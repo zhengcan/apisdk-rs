@@ -1,13 +1,13 @@
 use std::{collections::HashMap, str::FromStr, sync::OnceLock, time::Instant};
 
 use async_trait::async_trait;
+use http::Extensions;
 use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
 use regex::Regex;
 use reqwest::{Request, Response};
 use reqwest_middleware::{Middleware, Next, RequestBuilder, RequestInitialiser};
 use serde_json::Value;
-use task_local_extensions::Extensions;
 
 use crate::ResponseBody;
 
@@ -93,10 +93,9 @@ impl LogConfig {
 impl RequestInitialiser for LogConfig {
     fn init(&self, req: RequestBuilder) -> RequestBuilder {
         let mut req = req;
-        if req.extensions().contains::<LogConfig>() {
-            req
-        } else {
-            req.with_extension(self.clone())
+        match req.extensions().get::<LogConfig>() {
+            Some(_) => req,
+            None => req.with_extension(self.clone()),
         }
     }
 }
