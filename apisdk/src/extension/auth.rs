@@ -442,8 +442,8 @@ impl ParsedHashedToken {
         }
 
         let composed = decode_base64(token)
-            .map_err(|e| TokenError::Base64(e))
-            .and_then(|b| String::from_utf8(b).map_err(|e| TokenError::Utf8(e)))?;
+            .map_err(TokenError::Base64)
+            .and_then(|b| String::from_utf8(b).map_err(TokenError::Utf8))?;
         let terms: Vec<&str> = composed.split(',').collect();
         let mut iter = terms.iter();
         match terms.len() {
@@ -454,7 +454,7 @@ impl ParsedHashedToken {
                     .next()
                     .unwrap()
                     .parse()
-                    .map_err(|e| TokenError::Timestamp(e))?,
+                    .map_err(TokenError::Timestamp)?,
                 sign: iter.next().unwrap().to_string(),
             }),
             3 => Ok(Self {
@@ -464,7 +464,7 @@ impl ParsedHashedToken {
                     .next()
                     .unwrap()
                     .parse()
-                    .map_err(|e| TokenError::Timestamp(e))?,
+                    .map_err(TokenError::Timestamp)?,
                 sign: iter.next().unwrap().to_string(),
             }),
             _ => Err(TokenError::Format),

@@ -31,7 +31,7 @@ where
 impl UrlRewriter for IpAddr {
     async fn rewrite(&self, url: Url) -> Result<Url, ApiError> {
         let mut url = url;
-        let _ = url.set_ip_host(self.clone());
+        let _ = url.set_ip_host(*self);
         Ok(url)
     }
 }
