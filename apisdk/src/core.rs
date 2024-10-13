@@ -130,7 +130,7 @@ impl ApiBuilder {
         // Apply middleware in correct order
         #[cfg(feature = "otel")]
         {
-            client = client.with(crate::otel::OtelMiddleware {
+            client = client.with(crate::extension::OtelMiddleware {
                 name: String::from("First"),
             });
         }
@@ -145,7 +145,7 @@ impl ApiBuilder {
         client = client.with(LogMiddleware);
         #[cfg(feature = "otel")]
         {
-            client = client.with(crate::otel::OtelMiddleware {
+            client = client.with(crate::extension::OtelMiddleware {
                 name: String::from("Last"),
             });
         }
