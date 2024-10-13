@@ -1,6 +1,6 @@
 [package]
 name = "apisdk"
-version = "0.0.15-beta.1"
+version = "0.0.15-beta.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "An easy-to-use API toolkit for writing HTTP API Clients for Rust."
@@ -24,7 +24,7 @@ opentelemetry_0_25 = ["opentelemetry_0_25_pkg"]
 opentelemetry_0_26 = ["opentelemetry_0_26_pkg"]
 
 [dependencies]
-apisdk-macros = { version = "0.0.15-beta.1", path = "../apisdk-macros" }
+apisdk-macros = { version = "0.0.15-beta.2", path = "../apisdk-macros" }
 async-trait = "0.1"
 futures = "0.3"
 http = "1.1"
