@@ -131,15 +131,6 @@ pub enum RequestPayload {
     Multipart(HashMap<String, String>),
 }
 
-/// This enum is used to hold request payload for logging
-#[cfg(feature = "tracing")]
-#[derive(Debug, Clone)]
-pub enum ResponsePayload {
-    Json(Value),
-    Xml(String),
-    Text(String),
-}
-
 /// This struct is used to write information to log
 #[derive(Debug, Clone)]
 pub struct Logger {
@@ -155,7 +146,7 @@ pub struct Logger {
     pub payload: Option<RequestPayload>,
     /// The reponse payload
     #[cfg(feature = "tracing")]
-    pub response: Option<ResponsePayload>,
+    pub span: tracing::Span,
 }
 
 lazy_static! {
@@ -252,7 +243,7 @@ impl Logger {
     pub fn log_response_json(&mut self, json: &Value) {
         #[cfg(feature = "tracing")]
         {
-            self.response = Some(ResponsePayload::Json(json.clone()));
+            span.record("resp.json", serde_json::to_string(json).unwrap_or_default());
         }
         if let Some(level) = self.log_level {
             log::log!(
@@ -270,7 +261,7 @@ impl Logger {
     pub fn log_response_xml(&mut self, xml: &str) {
         #[cfg(feature = "tracing")]
         {
-            self.response = Some(ResponsePayload::Xml(xml.to_string()));
+            span.record("resp.xml", xml.to_string());
         }
         if let Some(level) = self.log_level {
             log::log!(
@@ -288,7 +279,7 @@ impl Logger {
     pub fn log_response_text(&mut self, text: &str) {
         #[cfg(feature = "tracing")]
         {
-            self.response = Some(ResponsePayload::Text(text.to_string()));
+            span.record("resp.text", text.to_string());
         }
         if let Some(level) = self.log_level {
             log::log!(
