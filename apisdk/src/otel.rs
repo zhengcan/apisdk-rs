@@ -24,3 +24,30 @@ mod opentelemetry_0_26 {
 
 #[cfg(feature = "opentelemetry_0_26")]
 pub use opentelemetry_0_26::*;
+
+use http::Extensions;
+use reqwest::{Request, Response};
+use reqwest_middleware::{Error, Next};
+
+pub struct OtelMiddleware {
+    pub name: String,
+}
+
+#[async_trait::async_trait]
+impl crate::Middleware for OtelMiddleware {
+    async fn handle(
+        &self,
+        req: Request,
+        extensions: &mut Extensions,
+        next: Next<'_>,
+    ) -> Result<Response, Error> {
+        use crate::otel::*;
+        get_active_span(|span| {
+            span.add_event(
+                self.name.clone(),
+                vec![KeyValue::new("otel-middleware", self.name.clone())],
+            );
+        });
+        next.run(req, extensions).await
+    }
+}
