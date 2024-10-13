@@ -5,6 +5,8 @@ pub mod digest;
 mod executor;
 mod extension;
 mod extractor;
+#[cfg(feature = "otel")]
+mod otel;
 mod result;
 mod url;
 
@@ -41,6 +43,7 @@ pub use reqwest::Url;
 // Re-export reqwest_middleware types
 pub use reqwest_middleware::ClientWithMiddleware as Client;
 pub use reqwest_middleware::Error as MiddlewareError;
+pub use reqwest_middleware::Extension;
 pub use reqwest_middleware::Middleware;
 pub use reqwest_middleware::Next;
 pub use reqwest_middleware::RequestBuilder;

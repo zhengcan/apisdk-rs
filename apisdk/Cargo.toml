@@ -14,6 +14,15 @@ readme = "../README.md"
 [lib]
 doctest = false
 
+[features]
+default = []
+uuid = ["dep:uuid"]
+dns = ["dep:hickory-resolver"]
+otel = ["dep:tracing"]
+opentelemetry_0_24 = ["opentelemetry_0_24_pkg"]
+opentelemetry_0_25 = ["opentelemetry_0_25_pkg"]
+opentelemetry_0_26 = ["opentelemetry_0_26_pkg"]
+
 [dependencies]
 apisdk-macros = { version = "0.0.14", path = "../apisdk-macros" }
 async-trait = "0.1"
@@ -42,6 +51,10 @@ rand = "0.8"
 thiserror = "1.0"
 anyhow = "1.0"
 log = "0.4"
+tracing = { version = "0.1", optional = true }
+opentelemetry_0_24_pkg = { package = "opentelemetry", version = "0.24", optional = true }
+opentelemetry_0_25_pkg = { package = "opentelemetry", version = "0.25", optional = true }
+opentelemetry_0_26_pkg = { package = "opentelemetry", version = "0.26", optional = true }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 md-5 = { version = "0.10", features = ["asm"] }
@@ -56,8 +69,3 @@ tracing-log = "0.2"
 tracing-subscriber = "0.3"
 # tracing-opentelemetry = "0.26"
 # opentelemetry = "0.26"
-
-[features]
-default = []
-uuid = ["dep:uuid"]
-dns = ['dep:hickory-resolver']

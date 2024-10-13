@@ -91,6 +91,18 @@ pub async fn send_json<I>(
 where
     I: Serialize + ?Sized,
 {
+    #[cfg(feature = "otel")]
+    {
+        use crate::otel::*;
+        get_active_span(|span| {
+            span.set_attribute(KeyValue::new("req.type", "json"));
+            span.set_attribute(KeyValue::new(
+                "req.body",
+                serde_json::to_string(json).unwrap_or_default(),
+            ));
+        });
+    }
+
     req = req.json(json);
 
     // Inject extensions
@@ -120,6 +132,16 @@ where
     I: Serialize + ?Sized,
 {
     let xml = quick_xml::se::to_string(xml)?;
+
+    #[cfg(feature = "otel")]
+    {
+        use crate::otel::*;
+        get_active_span(|span| {
+            span.set_attribute(KeyValue::new("req.type", "xml"));
+            span.set_attribute(KeyValue::new("req.body", xml.clone()));
+        });
+    }
+
     req = req.header(CONTENT_TYPE, MimeType::Xml).body(xml.clone());
 
     // Inject extensions
@@ -146,6 +168,18 @@ where
 {
     let is_multipart = form.is_multipart();
     let meta = form.get_meta();
+
+    #[cfg(feature = "otel")]
+    {
+        use crate::otel::*;
+        get_active_span(|span| {
+            span.set_attribute(KeyValue::new(
+                "req.type",
+                if is_multipart { "multipart" } else { "form" },
+            ));
+            span.set_attribute(KeyValue::new("req.body", format!("{:?}", meta)));
+        });
+    }
 
     if is_multipart {
         if let Some(multipart) = form.get_multipart() {
@@ -184,6 +218,16 @@ where
 {
     let form = form.get_multipart().ok_or(ApiError::MultipartForm)?;
     let meta = form.get_meta();
+
+    #[cfg(feature = "otel")]
+    {
+        use crate::otel::*;
+        get_active_span(|span| {
+            span.set_attribute(KeyValue::new("req.type", "multipart"));
+            span.set_attribute(KeyValue::new("req.body", format!("{:?}", meta)));
+        });
+    }
+
     req = req.multipart(form);
 
     // Inject extensions
@@ -213,7 +257,23 @@ pub async fn send_raw(mut req: RequestBuilder, config: RequestConfigurator) -> A
 /// Send request, and return unparsed response
 /// - req: the request to send
 /// - logger: helper to log messages
-async fn send_and_unparse(mut req: RequestBuilder, logger: Logger) -> ApiResult<Response> {
+async fn send_and_unparse(req: RequestBuilder, logger: Logger) -> ApiResult<Response> {
+    let result = do_send_and_unparse(req, logger).await;
+    #[cfg(feature = "otel")]
+    {
+        use crate::otel::*;
+        if let Err(e) = &result {
+            get_active_span(|span| {
+                span.set_status(Status::Error {
+                    description: e.to_string().into(),
+                });
+            });
+        }
+    }
+    result
+}
+
+async fn do_send_and_unparse(mut req: RequestBuilder, logger: Logger) -> ApiResult<Response> {
     let extensions = req.extensions();
 
     // Mock
@@ -254,6 +314,26 @@ async fn send_and_unparse(mut req: RequestBuilder, logger: Logger) -> ApiResult<
 /// - logger: helper to log messages
 /// - require_headers: should zip headers into response body
 async fn send_and_parse(
+    req: RequestBuilder,
+    logger: Logger,
+    require_headers: bool,
+) -> ApiResult<ResponseBody> {
+    let result = do_send_and_parse(req, logger, require_headers).await;
+    #[cfg(feature = "otel")]
+    {
+        use crate::otel::*;
+        if let Err(e) = &result {
+            get_active_span(|span| {
+                span.set_status(Status::Error {
+                    description: e.to_string().into(),
+                });
+            });
+        }
+    }
+    result
+}
+
+async fn do_send_and_parse(
     mut req: RequestBuilder,
     logger: Logger,
     require_headers: bool,
@@ -300,6 +380,15 @@ async fn send_and_parse(
         .and_then(|v| v.to_str().ok())
         .map(MimeType::from)
         .unwrap_or(MimeType::Text);
+
+    #[cfg(feature = "otel")]
+    {
+        use crate::otel::*;
+        get_active_span(|span| {
+            span.set_attribute(KeyValue::new("resp.type", content_type.to_string()));
+        });
+    }
+
     match content_type {
         MimeType::Json => parse_as_json(res, content_type, logger, require_headers).await,
         MimeType::Xml => parse_as_xml(res, content_type, logger).await,
@@ -331,6 +420,16 @@ async fn parse_as_json(
     // Decode response
     let mut json = match res.json::<Value>().await {
         Ok(json) => {
+            #[cfg(feature = "otel")]
+            {
+                use crate::otel::*;
+                get_active_span(|span| {
+                    span.set_attribute(KeyValue::new(
+                        "resp.json",
+                        serde_json::to_string(&json).unwrap_or_default(),
+                    ));
+                });
+            }
             logger.log_response_json(&json);
             json
         }
@@ -363,6 +462,13 @@ async fn parse_as_xml(
     // Decode response as text
     let text = match res.text().await {
         Ok(text) => {
+            #[cfg(feature = "otel")]
+            {
+                use crate::otel::*;
+                get_active_span(|span| {
+                    span.set_attribute(KeyValue::new("resp.xml", text.clone()));
+                });
+            }
             logger.log_response_xml(&text);
             text
         }
@@ -385,6 +491,13 @@ async fn parse_as_text(
     // Decode response
     let text = match res.text().await {
         Ok(text) => {
+            #[cfg(feature = "otel")]
+            {
+                use crate::otel::*;
+                get_active_span(|span| {
+                    span.set_attribute(KeyValue::new("resp.text", text.clone()));
+                });
+            }
             logger.log_response_text(&text);
             text
         }
