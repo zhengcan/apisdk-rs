@@ -111,15 +111,14 @@ impl Middleware for LogMiddleware {
         extensions: &mut Extensions,
         next: Next<'_>,
     ) -> Result<Response, reqwest_middleware::Error> {
-        match extensions.remove::<Logger>() {
-            Some(logger) => {
-                logger.log_request(&req);
-                let res = next.run(req, extensions).await?;
-                logger.log_response(&res);
-                Ok(res)
-            }
-            None => next.run(req, extensions).await,
+        if let Some(logger) = extensions.get::<Logger>() {
+            logger.log_request(&req);
         }
+        let res = next.run(req, extensions).await?;
+        if let Some(logger) = extensions.get::<Logger>() {
+            logger.log_response(&res);
+        }
+        Ok(res)
     }
 }
 
@@ -130,6 +129,15 @@ pub enum RequestPayload {
     Xml(String),
     Form(HashMap<String, String>),
     Multipart(HashMap<String, String>),
+}
+
+/// This enum is used to hold request payload for logging
+#[cfg(feature = "tracing")]
+#[derive(Debug, Clone)]
+pub enum ResponsePayload {
+    Json(Value),
+    Xml(String),
+    Text(String),
 }
 
 /// This struct is used to write information to log
@@ -145,6 +153,9 @@ pub struct Logger {
     pub start: Instant,
     /// The request payload
     pub payload: Option<RequestPayload>,
+    /// The reponse payload
+    #[cfg(feature = "tracing")]
+    pub response: Option<ResponsePayload>,
 }
 
 lazy_static! {
@@ -160,6 +171,8 @@ impl Logger {
             request_id,
             start: Instant::now(),
             payload: None,
+            #[cfg(feature = "tracing")]
+            response: Default::default(),
         }
     }
 
@@ -236,7 +249,11 @@ impl Logger {
     }
 
     /// Log response json payload
-    pub fn log_response_json(&self, json: &Value) {
+    pub fn log_response_json(&mut self, json: &Value) {
+        #[cfg(feature = "tracing")]
+        {
+            self.response = Some(ResponsePayload::Json(json.clone()));
+        }
         if let Some(level) = self.log_level {
             log::log!(
                 target: &self.log_target,
@@ -250,7 +267,11 @@ impl Logger {
     }
 
     /// Log response xml payload
-    pub fn log_response_xml(&self, xml: &str) {
+    pub fn log_response_xml(&mut self, xml: &str) {
+        #[cfg(feature = "tracing")]
+        {
+            self.response = Some(ResponsePayload::Xml(xml.to_string()));
+        }
         if let Some(level) = self.log_level {
             log::log!(
                 target: &self.log_target,
@@ -264,7 +285,11 @@ impl Logger {
     }
 
     /// Log response text payload
-    pub fn log_response_text(&self, text: &str) {
+    pub fn log_response_text(&mut self, text: &str) {
+        #[cfg(feature = "tracing")]
+        {
+            self.response = Some(ResponsePayload::Text(text.to_string()));
+        }
         if let Some(level) = self.log_level {
             log::log!(
                 target: &self.log_target,
@@ -286,7 +311,7 @@ impl Logger {
     }
 
     /// Log mock response body
-    pub fn log_mock_response_body(&self, body: &ResponseBody) {
+    pub fn log_mock_response_body(&mut self, body: &ResponseBody) {
         match body {
             ResponseBody::Json(json) => self.log_response_json(json),
             ResponseBody::Xml(xml) => self.log_response_xml(xml),

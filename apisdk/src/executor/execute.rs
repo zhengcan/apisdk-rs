@@ -214,7 +214,7 @@ pub async fn send_raw(mut req: RequestBuilder, config: RequestConfigurator) -> A
 /// Send request, and return unparsed response
 /// - req: the request to send
 /// - logger: helper to log messages
-async fn send_and_unparse(mut req: RequestBuilder, logger: Logger) -> ApiResult<Response> {
+async fn send_and_unparse(mut req: RequestBuilder, mut logger: Logger) -> ApiResult<Response> {
     let extensions = req.extensions();
 
     // Mock
@@ -256,7 +256,7 @@ async fn send_and_unparse(mut req: RequestBuilder, logger: Logger) -> ApiResult<
 /// - require_headers: should zip headers into response body
 async fn send_and_parse(
     mut req: RequestBuilder,
-    logger: Logger,
+    mut logger: Logger,
     require_headers: bool,
 ) -> ApiResult<ResponseBody> {
     let extensions = req.extensions();
@@ -313,7 +313,7 @@ async fn send_and_parse(
 async fn parse_as_json(
     res: Response,
     content_type: MimeType,
-    logger: Logger,
+    mut logger: Logger,
     require_headers: bool,
 ) -> ApiResult<ResponseBody> {
     // Extract HTTP headers from response
@@ -359,7 +359,7 @@ async fn parse_as_json(
 async fn parse_as_xml(
     res: Response,
     content_type: MimeType,
-    logger: Logger,
+    mut logger: Logger,
 ) -> ApiResult<ResponseBody> {
     // Decode response as text
     let text = match res.text().await {
@@ -381,7 +381,7 @@ async fn parse_as_xml(
 async fn parse_as_text(
     res: Response,
     content_type: MimeType,
-    logger: Logger,
+    mut logger: Logger,
 ) -> ApiResult<ResponseBody> {
     // Decode response
     let text = match res.text().await {

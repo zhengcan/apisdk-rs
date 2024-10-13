@@ -5,8 +5,6 @@ pub mod digest;
 mod executor;
 mod extension;
 mod extractor;
-// #[cfg(feature = "otel")]
-// mod otel;
 mod result;
 mod url;
 

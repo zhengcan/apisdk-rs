@@ -16,14 +16,9 @@ doctest = false
 
 [features]
 default = []
-# default = ["otel", "opentelemetry_0_24"]
 uuid = ["dep:uuid"]
 dns = ["dep:hickory-resolver"]
-otel = ["tracing"]
 tracing = ["dep:tracing", "dep:reqwest-tracing"]
-opentelemetry_0_24 = ["opentelemetry_0_24_pkg"]
-opentelemetry_0_25 = ["opentelemetry_0_25_pkg"]
-opentelemetry_0_26 = ["opentelemetry_0_26_pkg"]
 
 [dependencies]
 apisdk-macros = { version = "0.0.15-beta.4", path = "../apisdk-macros" }
@@ -55,9 +50,6 @@ thiserror = "1.0"
 anyhow = "1.0"
 log = "0.4"
 tracing = { version = "0.1", optional = true }
-opentelemetry_0_24_pkg = { package = "opentelemetry", version = "0.24", optional = true }
-opentelemetry_0_25_pkg = { package = "opentelemetry", version = "0.25", optional = true }
-opentelemetry_0_26_pkg = { package = "opentelemetry", version = "0.26", optional = true }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 md-5 = { version = "0.10", features = ["asm"] }
