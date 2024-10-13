@@ -16,9 +16,11 @@ doctest = false
 
 [features]
 default = []
+# default = ["otel", "opentelemetry_0_24"]
 uuid = ["dep:uuid"]
 dns = ["dep:hickory-resolver"]
-otel = ["dep:tracing"]
+otel = ["tracing"]
+tracing = ["dep:tracing", "dep:reqwest-tracing"]
 opentelemetry_0_24 = ["opentelemetry_0_24_pkg"]
 opentelemetry_0_25 = ["opentelemetry_0_25_pkg"]
 opentelemetry_0_26 = ["opentelemetry_0_26_pkg"]
@@ -31,6 +33,7 @@ http = "1.1"
 url = "2.5"
 reqwest = { version = "0.12", features = ["json", "multipart"] }
 reqwest-middleware = { version = "0.3", features = ["json", "multipart"] }
+reqwest-tracing = { version = "0.5", optional = true }
 hickory-resolver = { version = "0.24", optional = true }
 hyper = "1.4"
 hyper-util = "0.1"

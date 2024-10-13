@@ -125,7 +125,7 @@ impl Middleware for LogMiddleware {
 
 /// This enum is used to hold request payload for logging
 #[derive(Debug, Clone)]
-enum RequestPayload {
+pub enum RequestPayload {
     Json(Value),
     Xml(String),
     Form(HashMap<String, String>),
@@ -134,17 +134,17 @@ enum RequestPayload {
 
 /// This struct is used to write information to log
 #[derive(Debug, Clone)]
-pub(crate) struct Logger {
+pub struct Logger {
     /// The target of log
-    log_target: String,
+    pub log_target: String,
     /// The level of log
-    log_level: Option<Level>,
+    pub log_level: Option<Level>,
     /// The X-Request-ID value
-    request_id: String,
+    pub request_id: String,
     /// The start instant
-    start: Instant,
+    pub start: Instant,
     /// The request payload
-    payload: Option<RequestPayload>,
+    pub payload: Option<RequestPayload>,
 }
 
 lazy_static! {

@@ -128,12 +128,6 @@ impl ApiBuilder {
         let mut client = reqwest_middleware::ClientBuilder::new(client.build().unwrap());
 
         // Apply middleware in correct order
-        #[cfg(feature = "otel")]
-        {
-            client = client.with(crate::extension::OtelMiddleware {
-                name: String::from("First"),
-            });
-        }
         client = client.with(RequestTraceIdMiddleware);
         // client = client.with(RewriteHostMiddleware);
         for middleware in self.middlewares {
@@ -143,12 +137,6 @@ impl ApiBuilder {
             client = client.with(AuthenticateMiddleware);
         }
         client = client.with(LogMiddleware);
-        #[cfg(feature = "otel")]
-        {
-            client = client.with(crate::extension::OtelMiddleware {
-                name: String::from("Last"),
-            });
-        }
 
         // Apply initialisers
         if let Some(logger) = self.logger {
