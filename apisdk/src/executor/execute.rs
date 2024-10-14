@@ -83,12 +83,9 @@ pub async fn send(req: RequestBuilder, config: RequestConfigurator) -> ApiResult
     {
         let span = tracing::info_span!(
             "API call / send",
-            otel.name = config.get_caller(),
+            otel.name = format!("[API] {}", config.get_caller()),
             "api.func" = config.log_target,
             "resp.type" = tracing::field::Empty,
-            "resp.json" = tracing::field::Empty,
-            "resp.xml" = tracing::field::Empty,
-            "resp.text" = tracing::field::Empty,
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
         );
@@ -126,22 +123,18 @@ where
     {
         let span = tracing::info_span!(
             "API call / send_json",
-            otel.name = config.get_caller(),
+            otel.name = format!("[API] {}", config.get_caller()),
             "api.func" = config.log_target,
             "req.type" = "json",
-            "req.json" = serde_json::to_string(json).unwrap_or_default(),
             "resp.type" = tracing::field::Empty,
-            "resp.json" = tracing::field::Empty,
-            "resp.xml" = tracing::field::Empty,
-            "resp.text" = tracing::field::Empty,
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
         );
         with_span(do_send_json(req, json, config), span, || {
             tracing::info!(
-                name = "req.json",
-                "{}",
-                serde_json::to_string(json).unwrap_or_default()
+                name = "request",
+                json = serde_json::to_string(json).unwrap_or_default(),
+                "request.json",
             );
         })
         .await
@@ -191,19 +184,15 @@ where
     {
         let span = tracing::info_span!(
             "API call / send_xml",
-            otel.name = config.get_caller(),
+            otel.name = format!("[API] {}", config.get_caller()),
             "api.func" = config.log_target,
             "req.type" = "xml",
-            "req.xml" = &xml,
             "resp.type" = tracing::field::Empty,
-            "resp.json" = tracing::field::Empty,
-            "resp.xml" = tracing::field::Empty,
-            "resp.text" = tracing::field::Empty,
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
         );
         with_span(do_send_xml(req, xml.clone(), config), span, || {
-            tracing::info!(name = "req.xml", "{}", xml);
+            tracing::info!(name = "request", xml = xml, "request.xml",);
         })
         .await
     }
@@ -254,14 +243,10 @@ where
         let type_name = if is_multipart { "multipart" } else { "form" };
         let span = tracing::info_span!(
             "API call / send_form",
-            otel.name = config.get_caller(),
+            otel.name = format!("[API] {}", config.get_caller()),
             "api.func" = config.log_target,
             "req.type" = type_name,
-            "req.form" = serde_json::to_string(&meta).unwrap_or_default(),
             "resp.type" = tracing::field::Empty,
-            "resp.json" = tracing::field::Empty,
-            "resp.xml" = tracing::field::Empty,
-            "resp.text" = tracing::field::Empty,
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
         );
@@ -270,9 +255,10 @@ where
             span,
             || {
                 tracing::info!(
-                    name = "req.form",
-                    "{}",
-                    serde_json::to_string(&meta).unwrap_or_default()
+                    name = "request",
+                    form = serde_json::to_string(&meta).unwrap_or_default(),
+                    "request.{}",
+                    type_name,
                 );
             },
         )
@@ -324,22 +310,18 @@ where
     {
         let span = tracing::info_span!(
             "API call / send_multipart",
-            otel.name = config.get_caller(),
+            otel.name = format!("[API] {}", config.get_caller()),
             "api.func" = config.log_target,
             "req.type" = "multipart",
-            "req.form" = serde_json::to_string(&meta).unwrap_or_default(),
             "resp.type" = tracing::field::Empty,
-            "resp.json" = tracing::field::Empty,
-            "resp.xml" = tracing::field::Empty,
-            "resp.text" = tracing::field::Empty,
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
         );
         with_span(do_send_multipart(req, meta.clone(), config), span, || {
             tracing::info!(
-                name = "req.form",
-                "{}",
-                serde_json::to_string(&meta).unwrap_or_default()
+                name = "request",
+                form = serde_json::to_string(&meta).unwrap_or_default(),
+                "request.multipart"
             );
         })
         .await
@@ -371,13 +353,10 @@ pub async fn send_raw(req: RequestBuilder, config: RequestConfigurator) -> ApiRe
     {
         let span = tracing::info_span!(
             "API call / send_raw",
-            otel.name = config.get_caller(),
+            otel.name = format!("[API] {}", config.get_caller()),
             "api.func" = config.log_target,
             "req.type" = "raw",
             "resp.type" = tracing::field::Empty,
-            "resp.json" = tracing::field::Empty,
-            "resp.xml" = tracing::field::Empty,
-            "resp.text" = tracing::field::Empty,
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
         );
@@ -412,27 +391,29 @@ where
             Ok(response) => match response {
                 ResponseBody::Json(value) => {
                     span.record("resp.type", "json");
-                    span.record(
-                        "resp.json",
-                        serde_json::to_string(value).unwrap_or_default(),
+                    tracing::info!(
+                        name = "response",
+                        json = serde_json::to_string(value).unwrap_or_default(),
+                        "response.json",
                     );
-                    tracing::info!(target: "resp.json", name = "the-resp.json", "type" = "json", "{}", serde_json::to_string(value).unwrap_or_default());
                 }
                 ResponseBody::Xml(xml) => {
                     span.record("resp.type", "xml");
-                    span.record("resp.xml", xml);
-                    tracing::info!(target: "resp.xml", name = "the-resp.xml", "type" = "xml", "{}", xml);
+                    tracing::info!(name = "response", xml = xml, "response.xml",);
                 }
                 ResponseBody::Text(text) => {
                     span.record("resp.type", "text");
-                    span.record("resp.text", text);
-                    tracing::info!(target: "resp.text", name = "the-resp.text", "type" = "text", "{}", text);
+                    tracing::info!(name = "response", text = text, "response.text",);
                 }
             },
             Err(e) => {
                 span.record("error", true);
                 span.record("exception", e.to_string());
-                tracing::warn!(target: "exception", name = "the-exception", "{}", e);
+                tracing::warn!(
+                    name = "exception",
+                    exception = e.to_string(),
+                    "response.error",
+                );
             }
         }
         outcome
