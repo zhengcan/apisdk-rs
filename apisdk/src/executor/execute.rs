@@ -48,7 +48,7 @@ impl RequestConfigurator {
     #[cfg(feature = "tracing")]
     fn get_caller(&self) -> &str {
         match self.log_target.rsplit_once("::") {
-            Some((fn_name, _)) => fn_name,
+            Some((_, fn_name)) => fn_name,
             None => self.log_target,
         }
     }
@@ -84,6 +84,7 @@ pub async fn send(req: RequestBuilder, config: RequestConfigurator) -> ApiResult
         let span = tracing::info_span!(
             "API call / send",
             otel.name = config.get_caller(),
+            "api.func" = config.log_target,
             "resp.type" = tracing::field::Empty,
             "resp.json" = tracing::field::Empty,
             "resp.xml" = tracing::field::Empty,
@@ -96,67 +97,6 @@ pub async fn send(req: RequestBuilder, config: RequestConfigurator) -> ApiResult
     #[cfg(not(feature = "tracing"))]
     do_send(req, config).await
 }
-
-#[cfg(feature = "tracing")]
-async fn with_span<F>(f: F, span: tracing::Span) -> Result<ResponseBody, ApiError>
-where
-    F: std::future::Future<Output = Result<ResponseBody, ApiError>>,
-{
-    let future = async {
-        let outcome = f.await;
-        match outcome.as_ref() {
-            Ok(response) => match response {
-                ResponseBody::Json(value) => {
-                    span.record("resp.type", "json");
-                    span.record(
-                        "resp.json",
-                        serde_json::to_string(value).unwrap_or_default(),
-                    );
-                }
-                ResponseBody::Xml(xml) => {
-                    span.record("resp.type", "xml");
-                    span.record("resp.xml", xml);
-                }
-                ResponseBody::Text(text) => {
-                    span.record("resp.type", "text");
-                    span.record("resp.text", text);
-                }
-            },
-            Err(e) => {
-                span.record("error", true);
-                span.record("exception", e.to_string());
-            }
-        }
-        outcome
-    };
-    future.instrument(span.clone()).await
-}
-
-#[cfg(feature = "tracing")]
-async fn with_span_raw<F>(f: F, span: tracing::Span) -> Result<Response, ApiError>
-where
-    F: std::future::Future<Output = Result<Response, ApiError>>,
-{
-    let future = async {
-        let outcome = f.await;
-        match outcome.as_ref() {
-            Ok(response) => {
-                if let Some(content_type) = response.headers().get(CONTENT_TYPE) {
-                    if let Ok(content_type) = content_type.to_str() {
-                        span.record("resp.type", content_type);
-                    }
-                }
-            }
-            Err(e) => {
-                span.record("error", true);
-                span.record("exception", e.to_string());
-            }
-        }
-        outcome
-    };
-    future.instrument(span.clone()).await
-}
-
 async fn do_send(mut req: RequestBuilder, config: RequestConfigurator) -> ApiResult<ResponseBody> {
     // Inject extensions
     req = RequestTraceIdMiddleware::inject_extension(req);
@@ -187,14 +127,20 @@ where
         let span = tracing::info_span!(
             "API call / send_json",
             otel.name = config.get_caller(),
+            "api.func" = config.log_target,
             "req.type" = "json",
-            "req.json" = serde_json::to_string(json).unwrap(),
+            "req.json" = serde_json::to_string(json).unwrap_or_default(),
             "resp.type" = tracing::field::Empty,
             "resp.json" = tracing::field::Empty,
             "resp.xml" = tracing::field::Empty,
             "resp.text" = tracing::field::Empty,
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
+        );
+        tracing::info!(
+            name = "req.json",
+            "{}",
+            serde_json::to_string(json).unwrap_or_default()
         );
         with_span(do_send_json(req, json, config), span).await
     }
@@ -244,6 +190,7 @@ where
         let span = tracing::info_span!(
             "API call / send_xml",
             otel.name = config.get_caller(),
+            "api.func" = config.log_target,
             "req.type" = "xml",
             "req.xml" = &xml,
             "resp.type" = tracing::field::Empty,
@@ -253,6 +200,7 @@ where
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
         );
+        tracing::info!(name = "req.xml", "{}", xml);
         with_span(do_send_xml(req, xml, config), span).await
     }
     #[cfg(not(feature = "tracing"))]
@@ -303,6 +251,7 @@ where
         let span = tracing::info_span!(
             "API call / send_form",
             otel.name = config.get_caller(),
+            "api.func" = config.log_target,
             "req.type" = type_name,
             "req.form" = serde_json::to_string(&meta).unwrap_or_default(),
             "resp.type" = tracing::field::Empty,
@@ -311,6 +260,11 @@ where
             "resp.text" = tracing::field::Empty,
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
+        );
+        tracing::info!(
+            name = "req.form",
+            "{}",
+            serde_json::to_string(&meta).unwrap_or_default()
         );
         with_span(do_send_form(req, is_multipart, meta, config), span).await
     }
@@ -361,6 +315,7 @@ where
         let span = tracing::info_span!(
             "API call / send_multipart",
             otel.name = config.get_caller(),
+            "api.func" = config.log_target,
             "req.type" = "multipart",
             "req.form" = serde_json::to_string(&meta).unwrap_or_default(),
             "resp.type" = tracing::field::Empty,
@@ -369,6 +324,11 @@ where
             "resp.text" = tracing::field::Empty,
             "error" = tracing::field::Empty,
             "exception" = tracing::field::Empty,
+        );
+        tracing::info!(
+            name = "req.form",
+            "{}",
+            serde_json::to_string(&meta).unwrap_or_default()
         );
         with_span(do_send_multipart(req, meta, config), span).await
     }
@@ -400,6 +360,7 @@ pub async fn send_raw(req: RequestBuilder, config: RequestConfigurator) -> ApiRe
         let span = tracing::info_span!(
             "API call / send_raw",
             otel.name = config.get_caller(),
+            "api.func" = config.log_target,
             "req.type" = "raw",
             "resp.type" = tracing::field::Empty,
             "resp.json" = tracing::field::Empty,
@@ -423,6 +384,72 @@ async fn do_send_raw(mut req: RequestBuilder, config: RequestConfigurator) -> Ap
     }
 
     send_and_unparse(req, logger).await
+}
+
+/// Send request with a tracing span
+#[cfg(feature = "tracing")]
+async fn with_span<F>(f: F, span: tracing::Span) -> Result<ResponseBody, ApiError>
+where
+    F: std::future::Future<Output = Result<ResponseBody, ApiError>>,
+{
+    let future = async {
+        let outcome = f.await;
+        match outcome.as_ref() {
+            Ok(response) => match response {
+                ResponseBody::Json(value) => {
+                    span.record("resp.type", "json");
+                    span.record(
+                        "resp.json",
+                        serde_json::to_string(value).unwrap_or_default(),
+                    );
+                    tracing::info!(name: "resp.json", "{}", serde_json::to_string(value).unwrap_or_default());
+                }
+                ResponseBody::Xml(xml) => {
+                    span.record("resp.type", "xml");
+                    span.record("resp.xml", xml);
+                    tracing::info!(name: "resp.xml", "{}", xml);
+                }
+                ResponseBody::Text(text) => {
+                    span.record("resp.type", "text");
+                    span.record("resp.text", text);
+                    tracing::info!(name: "resp.text", "{}", text);
+                }
+            },
+            Err(e) => {
+                span.record("error", true);
+                span.record("exception", e.to_string());
+            }
+        }
+        outcome
+    };
+    future.instrument(span.clone()).await
+}
+
+/// Send request with a tracing span
+#[cfg(feature = "tracing")]
+async fn with_span_raw<F>(f: F, span: tracing::Span) -> Result<Response, ApiError>
+where
+    F: std::future::Future<Output = Result<Response, ApiError>>,
+{
+    let future = async {
+        let outcome = f.await;
+        match outcome.as_ref() {
+            Ok(response) => {
+                if let Some(content_type) = response.headers().get(CONTENT_TYPE) {
+                    if let Ok(content_type) = content_type.to_str() {
+                        span.record("resp.type", content_type);
+                    }
+                }
+            }
+            Err(e) => {
+                span.record("error", true);
+                span.record("exception", e.to_string());
+                tracing::warn!(name: "exception", "{}", e);
+            }
+        }
+        outcome
+    };
+    future.instrument(span.clone()).await
 }
 
 /// Send request, and return unparsed response
