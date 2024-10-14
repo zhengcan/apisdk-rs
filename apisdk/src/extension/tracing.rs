@@ -5,7 +5,7 @@ use reqwest_tracing::{
 };
 use tracing::Span;
 
-use super::{Logger, RequestPayload, ResponsePayload};
+use super::{Logger, RequestPayload};
 
 pub struct WithLogger {}
 
@@ -26,7 +26,8 @@ impl ReqwestOtelSpanBackend for WithLogger {
             "resp.xml" = tracing::field::Empty,
             "resp.text" = tracing::field::Empty,
         );
-        if let Some(logger) = ext.get::<Logger>() {
+        if let Some(logger) = ext.get_mut::<Logger>() {
+            logger.set_span(span.clone());
             span.record("api.func", &logger.log_target);
             span.record("reques_id", &logger.request_id);
             if let Some(payload) = logger.payload.as_ref() {
@@ -65,30 +66,12 @@ impl ReqwestOtelSpanBackend for WithLogger {
     fn on_request_end(
         span: &Span,
         outcome: &Result<Response, reqwest_middleware::Error>,
-        ext: &mut Extensions,
+        _: &mut Extensions,
     ) {
         if let Ok(res) = outcome {
             if let Some(content_type) = res.headers().get(CONTENT_TYPE) {
                 if let Ok(content_type) = content_type.to_str() {
                     span.record("resp.type", content_type);
-                }
-            }
-        }
-        if let Some(logger) = ext.get::<Logger>() {
-            if let Some(payload) = logger.response.as_ref() {
-                match payload {
-                    ResponsePayload::Json(json) => {
-                        span.record(
-                            "resp.json",
-                            serde_json::to_string(&json).unwrap_or_default(),
-                        );
-                    }
-                    ResponsePayload::Xml(xml) => {
-                        span.record("resp.xml", xml.to_string());
-                    }
-                    ResponsePayload::Text(text) => {
-                        span.record("resp.text", text.to_string());
-                    }
                 }
             }
         }

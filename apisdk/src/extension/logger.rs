@@ -146,7 +146,7 @@ pub struct Logger {
     pub payload: Option<RequestPayload>,
     /// The reponse payload
     #[cfg(feature = "tracing")]
-    pub span: tracing::Span,
+    pub span: Option<tracing::Span>,
 }
 
 lazy_static! {
@@ -163,7 +163,7 @@ impl Logger {
             start: Instant::now(),
             payload: None,
             #[cfg(feature = "tracing")]
-            response: Default::default(),
+            span: None,
         }
     }
 
@@ -194,6 +194,12 @@ impl Logger {
     pub fn with_multipart(mut self, meta: HashMap<String, String>) -> Self {
         self.payload = Some(RequestPayload::Multipart(meta));
         self
+    }
+
+    /// Set the span
+    #[cfg(feature = "tracing")]
+    pub fn set_span(&mut self, span: tracing::Span) {
+        self.span = Some(span);
     }
 }
 
@@ -240,10 +246,12 @@ impl Logger {
     }
 
     /// Log response json payload
-    pub fn log_response_json(&mut self, json: &Value) {
+    pub fn log_response_json(&self, json: &Value) {
         #[cfg(feature = "tracing")]
         {
-            span.record("resp.json", serde_json::to_string(json).unwrap_or_default());
+            if let Some(span) = self.span.as_ref() {
+                span.record("resp.json", serde_json::to_string(json).unwrap_or_default());
+            }
         }
         if let Some(level) = self.log_level {
             log::log!(
@@ -258,10 +266,12 @@ impl Logger {
     }
 
     /// Log response xml payload
-    pub fn log_response_xml(&mut self, xml: &str) {
+    pub fn log_response_xml(&self, xml: &str) {
         #[cfg(feature = "tracing")]
         {
-            span.record("resp.xml", xml.to_string());
+            if let Some(span) = self.span.as_ref() {
+                span.record("resp.xml", xml.to_string());
+            }
         }
         if let Some(level) = self.log_level {
             log::log!(
@@ -276,10 +286,12 @@ impl Logger {
     }
 
     /// Log response text payload
-    pub fn log_response_text(&mut self, text: &str) {
+    pub fn log_response_text(&self, text: &str) {
         #[cfg(feature = "tracing")]
         {
-            span.record("resp.text", text.to_string());
+            if let Some(span) = self.span.as_ref() {
+                span.record("resp.text", text.to_string());
+            }
         }
         if let Some(level) = self.log_level {
             log::log!(
@@ -302,7 +314,7 @@ impl Logger {
     }
 
     /// Log mock response body
-    pub fn log_mock_response_body(&mut self, body: &ResponseBody) {
+    pub fn log_mock_response_body(&self, body: &ResponseBody) {
         match body {
             ResponseBody::Json(json) => self.log_response_json(json),
             ResponseBody::Xml(xml) => self.log_response_xml(xml),
