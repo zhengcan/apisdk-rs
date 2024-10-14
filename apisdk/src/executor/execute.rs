@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use reqwest::{header::CONTENT_TYPE, Response, ResponseBuilderExt};
 use serde::Serialize;
 use serde_json::Value;
+#[cfg(feature = "tracing")]
+use tracing::Instrument;
 
 use crate::{
     get_default_log_level, ApiError, ApiResult, FormLike, IntoFilter, LogConfig, Logger, MimeType,
@@ -43,6 +45,14 @@ impl RequestConfigurator {
         }
     }
 
+    #[cfg(feature = "tracing")]
+    fn get_caller(&self) -> &str {
+        match self.log_target.rsplit_once("::") {
+            Some((fn_name, _)) => fn_name,
+            None => self.log_target,
+        }
+    }
+
     /// Build Logger
     fn build(self, req: &mut RequestBuilder) -> (Logger, bool) {
         let extensions = req.extensions();
@@ -68,7 +78,86 @@ impl RequestConfigurator {
 /// Send request
 /// - req: used to build request
 /// - config: control the send process
-pub async fn send(mut req: RequestBuilder, config: RequestConfigurator) -> ApiResult<ResponseBody> {
+pub async fn send(req: RequestBuilder, config: RequestConfigurator) -> ApiResult<ResponseBody> {
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::info_span!(
+            "API call / send",
+            otel.name = config.get_caller(),
+            "resp.type" = tracing::field::Empty,
+            "resp.json" = tracing::field::Empty,
+            "resp.xml" = tracing::field::Empty,
+            "resp.text" = tracing::field::Empty,
+            "error" = tracing::field::Empty,
+            "exception" = tracing::field::Empty,
+        );
+        with_span(do_send(req, config), span).await
+    }
+    #[cfg(not(feature = "tracing"))]
+    do_send(req, config).await
+}
+
+#[cfg(feature = "tracing")]
+async fn with_span<F>(f: F, span: tracing::Span) -> Result<ResponseBody, ApiError>
+where
+    F: std::future::Future<Output = Result<ResponseBody, ApiError>>,
+{
+    let future = async {
+        let outcome = f.await;
+        match outcome.as_ref() {
+            Ok(response) => match response {
+                ResponseBody::Json(value) => {
+                    span.record("resp.type", "json");
+                    span.record(
+                        "resp.json",
+                        serde_json::to_string(value).unwrap_or_default(),
+                    );
+                }
+                ResponseBody::Xml(xml) => {
+                    span.record("resp.type", "xml");
+                    span.record("resp.xml", xml);
+                }
+                ResponseBody::Text(text) => {
+                    span.record("resp.type", "text");
+                    span.record("resp.text", text);
+                }
+            },
+            Err(e) => {
+                span.record("error", true);
+                span.record("exception", e.to_string());
+            }
+        }
+        outcome
+    };
+    future.instrument(span.clone()).await
+}
+
+#[cfg(feature = "tracing")]
+async fn with_span_raw<F>(f: F, span: tracing::Span) -> Result<Response, ApiError>
+where
+    F: std::future::Future<Output = Result<Response, ApiError>>,
+{
+    let future = async {
+        let outcome = f.await;
+        match outcome.as_ref() {
+            Ok(response) => {
+                if let Some(content_type) = response.headers().get(CONTENT_TYPE) {
+                    if let Ok(content_type) = content_type.to_str() {
+                        span.record("resp.type", content_type);
+                    }
+                }
+            }
+            Err(e) => {
+                span.record("error", true);
+                span.record("exception", e.to_string());
+            }
+        }
+        outcome
+    };
+    future.instrument(span.clone()).await
+}
+
+async fn do_send(mut req: RequestBuilder, config: RequestConfigurator) -> ApiResult<ResponseBody> {
     // Inject extensions
     req = RequestTraceIdMiddleware::inject_extension(req);
     let (logger, require_headers) = config.build(&mut req);
@@ -84,6 +173,36 @@ pub async fn send(mut req: RequestBuilder, config: RequestConfigurator) -> ApiRe
 /// - json: request payload
 /// - config: control the send process
 pub async fn send_json<I>(
+    req: RequestBuilder,
+    json: &I,
+    config: RequestConfigurator,
+) -> ApiResult<ResponseBody>
+where
+    I: Serialize + ?Sized,
+{
+    let req = req.json(json);
+
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::info_span!(
+            "API call / send_json",
+            otel.name = config.get_caller(),
+            "req.type" = "json",
+            "req.json" = serde_json::to_string(json).unwrap(),
+            "resp.type" = tracing::field::Empty,
+            "resp.json" = tracing::field::Empty,
+            "resp.xml" = tracing::field::Empty,
+            "resp.text" = tracing::field::Empty,
+            "error" = tracing::field::Empty,
+            "exception" = tracing::field::Empty,
+        );
+        with_span(do_send_json(req, json, config), span).await
+    }
+    #[cfg(not(feature = "tracing"))]
+    do_send_json(req, json, config).await
+}
+
+async fn do_send_json<I>(
     mut req: RequestBuilder,
     json: &I,
     config: RequestConfigurator,
@@ -91,8 +210,6 @@ pub async fn send_json<I>(
 where
     I: Serialize + ?Sized,
 {
-    req = req.json(json);
-
     // Inject extensions
     req = RequestTraceIdMiddleware::inject_extension(req);
     let (logger, require_headers) = config.build(&mut req);
@@ -112,7 +229,7 @@ where
 /// - form: request payload
 /// - config: control the send process
 pub async fn send_xml<I>(
-    mut req: RequestBuilder,
+    req: RequestBuilder,
     xml: &I,
     config: RequestConfigurator,
 ) -> ApiResult<ResponseBody>
@@ -120,8 +237,33 @@ where
     I: Serialize + ?Sized,
 {
     let xml = quick_xml::se::to_string(xml)?;
-    req = req.header(CONTENT_TYPE, MimeType::Xml).body(xml.clone());
+    let req = req.header(CONTENT_TYPE, MimeType::Xml).body(xml.clone());
 
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::info_span!(
+            "API call / send_xml",
+            otel.name = config.get_caller(),
+            "req.type" = "xml",
+            "req.xml" = &xml,
+            "resp.type" = tracing::field::Empty,
+            "resp.json" = tracing::field::Empty,
+            "resp.xml" = tracing::field::Empty,
+            "resp.text" = tracing::field::Empty,
+            "error" = tracing::field::Empty,
+            "exception" = tracing::field::Empty,
+        );
+        with_span(do_send_xml(req, xml, config), span).await
+    }
+    #[cfg(not(feature = "tracing"))]
+    do_send_xml(req, xml, config).await
+}
+
+async fn do_send_xml(
+    mut req: RequestBuilder,
+    xml: String,
+    config: RequestConfigurator,
+) -> ApiResult<ResponseBody> {
     // Inject extensions
     req = RequestTraceIdMiddleware::inject_extension(req);
     let (logger, require_headers) = config.build(&mut req);
@@ -155,6 +297,33 @@ where
         req = req.form(&form);
     };
 
+    #[cfg(feature = "tracing")]
+    {
+        let type_name = if is_multipart { "multipart" } else { "form" };
+        let span = tracing::info_span!(
+            "API call / send_form",
+            otel.name = config.get_caller(),
+            "req.type" = type_name,
+            "req.form" = serde_json::to_string(&meta).unwrap_or_default(),
+            "resp.type" = tracing::field::Empty,
+            "resp.json" = tracing::field::Empty,
+            "resp.xml" = tracing::field::Empty,
+            "resp.text" = tracing::field::Empty,
+            "error" = tracing::field::Empty,
+            "exception" = tracing::field::Empty,
+        );
+        with_span(do_send_form(req, is_multipart, meta, config), span).await
+    }
+    #[cfg(not(feature = "tracing"))]
+    do_send_form(req, is_multipart, meta, config).await
+}
+
+async fn do_send_form(
+    mut req: RequestBuilder,
+    is_multipart: bool,
+    meta: HashMap<String, String>,
+    config: RequestConfigurator,
+) -> ApiResult<ResponseBody> {
     // Inject extensions
     req = RequestTraceIdMiddleware::inject_extension(req);
     let (logger, require_headers) = config.build(&mut req);
@@ -187,6 +356,31 @@ where
 
     req = req.multipart(form);
 
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::info_span!(
+            "API call / send_multipart",
+            otel.name = config.get_caller(),
+            "req.type" = "multipart",
+            "req.form" = serde_json::to_string(&meta).unwrap_or_default(),
+            "resp.type" = tracing::field::Empty,
+            "resp.json" = tracing::field::Empty,
+            "resp.xml" = tracing::field::Empty,
+            "resp.text" = tracing::field::Empty,
+            "error" = tracing::field::Empty,
+            "exception" = tracing::field::Empty,
+        );
+        with_span(do_send_multipart(req, meta, config), span).await
+    }
+    #[cfg(not(feature = "tracing"))]
+    do_send_multipart(req, meta, config).await
+}
+
+async fn do_send_multipart(
+    mut req: RequestBuilder,
+    meta: HashMap<String, String>,
+    config: RequestConfigurator,
+) -> ApiResult<ResponseBody> {
     // Inject extensions
     req = RequestTraceIdMiddleware::inject_extension(req);
     let (logger, require_headers) = config.build(&mut req);
@@ -200,9 +394,29 @@ where
 /// Send request, and get raw response
 /// - req: used to build request
 /// - config: control the send process
-pub async fn send_raw(mut req: RequestBuilder, config: RequestConfigurator) -> ApiResult<Response> {
-    req = RequestTraceIdMiddleware::inject_extension(req);
+pub async fn send_raw(req: RequestBuilder, config: RequestConfigurator) -> ApiResult<Response> {
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::info_span!(
+            "API call / send_raw",
+            otel.name = config.get_caller(),
+            "req.type" = "raw",
+            "resp.type" = tracing::field::Empty,
+            "resp.json" = tracing::field::Empty,
+            "resp.xml" = tracing::field::Empty,
+            "resp.text" = tracing::field::Empty,
+            "error" = tracing::field::Empty,
+            "exception" = tracing::field::Empty,
+        );
+        with_span_raw(do_send_raw(req, config), span).await
+    }
+    #[cfg(not(feature = "tracing"))]
+    do_send_raw(req, config).await
+}
 
+async fn do_send_raw(mut req: RequestBuilder, config: RequestConfigurator) -> ApiResult<Response> {
+    // Inject extensions
+    req = RequestTraceIdMiddleware::inject_extension(req);
     let (logger, _) = config.build(&mut req);
     if logger.is_enabled() {
         req = req.with_extension(logger.clone());

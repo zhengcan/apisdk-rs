@@ -7,6 +7,7 @@ use tracing::Span;
 
 use super::{Logger, RequestPayload};
 
+#[deprecated]
 pub struct WithLogger {}
 
 impl ReqwestOtelSpanBackend for WithLogger {
@@ -27,7 +28,6 @@ impl ReqwestOtelSpanBackend for WithLogger {
             "resp.text" = tracing::field::Empty,
         );
         if let Some(logger) = ext.get_mut::<Logger>() {
-            logger.set_span(span.clone());
             span.record("api.func", &logger.log_target);
             span.record("reques_id", &logger.request_id);
             if let Some(payload) = logger.payload.as_ref() {

@@ -124,7 +124,7 @@ impl Middleware for LogMiddleware {
 
 /// This enum is used to hold request payload for logging
 #[derive(Debug, Clone)]
-pub enum RequestPayload {
+pub(crate) enum RequestPayload {
     Json(Value),
     Xml(String),
     Form(HashMap<String, String>),
@@ -133,7 +133,7 @@ pub enum RequestPayload {
 
 /// This struct is used to write information to log
 #[derive(Debug, Clone)]
-pub struct Logger {
+pub(crate) struct Logger {
     /// The target of log
     pub log_target: String,
     /// The level of log
@@ -144,9 +144,6 @@ pub struct Logger {
     pub start: Instant,
     /// The request payload
     pub payload: Option<RequestPayload>,
-    /// The reponse payload
-    #[cfg(feature = "tracing")]
-    pub span: Option<tracing::Span>,
 }
 
 lazy_static! {
@@ -162,8 +159,6 @@ impl Logger {
             request_id,
             start: Instant::now(),
             payload: None,
-            #[cfg(feature = "tracing")]
-            span: None,
         }
     }
 
@@ -194,12 +189,6 @@ impl Logger {
     pub fn with_multipart(mut self, meta: HashMap<String, String>) -> Self {
         self.payload = Some(RequestPayload::Multipart(meta));
         self
-    }
-
-    /// Set the span
-    #[cfg(feature = "tracing")]
-    pub fn set_span(&mut self, span: tracing::Span) {
-        self.span = Some(span);
     }
 }
 
@@ -247,12 +236,6 @@ impl Logger {
 
     /// Log response json payload
     pub fn log_response_json(&self, json: &Value) {
-        #[cfg(feature = "tracing")]
-        {
-            if let Some(span) = self.span.as_ref() {
-                span.record("resp.json", serde_json::to_string(json).unwrap_or_default());
-            }
-        }
         if let Some(level) = self.log_level {
             log::log!(
                 target: &self.log_target,
@@ -267,12 +250,6 @@ impl Logger {
 
     /// Log response xml payload
     pub fn log_response_xml(&self, xml: &str) {
-        #[cfg(feature = "tracing")]
-        {
-            if let Some(span) = self.span.as_ref() {
-                span.record("resp.xml", xml.to_string());
-            }
-        }
         if let Some(level) = self.log_level {
             log::log!(
                 target: &self.log_target,
@@ -287,12 +264,6 @@ impl Logger {
 
     /// Log response text payload
     pub fn log_response_text(&self, text: &str) {
-        #[cfg(feature = "tracing")]
-        {
-            if let Some(span) = self.span.as_ref() {
-                span.record("resp.text", text.to_string());
-            }
-        }
         if let Some(level) = self.log_level {
             log::log!(
                 target: &self.log_target,
