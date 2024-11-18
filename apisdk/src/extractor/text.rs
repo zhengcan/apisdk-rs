@@ -13,6 +13,7 @@ impl Text {
         T: FromStr,
     {
         let text = match body {
+            ResponseBody::Empty => "".to_string(),
             ResponseBody::Json(json) => json.to_string(),
             ResponseBody::Xml(xml) => xml,
             ResponseBody::Text(text) => text,

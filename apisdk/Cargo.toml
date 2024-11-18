@@ -15,7 +15,7 @@ readme = "../README.md"
 doctest = false
 
 [features]
-default = ["tracing"]
+default = []
 uuid = ["dep:uuid"]
 dns = ["dep:hickory-resolver"]
 tracing = ["dep:tracing", "dep:reqwest-tracing"]

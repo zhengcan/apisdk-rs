@@ -1,6 +1,9 @@
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 
-use crate::{ApiResult, Json, ResponseBody, Xml};
+use crate::{ApiError, ApiResult, Json, ResponseBody, Xml};
+
+use super::MimeType;
 
 /// This struct is used to parse response body to json or xml
 #[derive(Debug)]
@@ -13,6 +16,12 @@ impl Auto {
         T: 'static + DeserializeOwned,
     {
         match &body {
+            ResponseBody::Empty => serde_json::from_value(Value::Null).map_err(|_| {
+                ApiError::DecodeResponse(
+                    MimeType::Empty,
+                    "Failed to decode empty response to result type.".to_string(),
+                )
+            }),
             ResponseBody::Json(_) => Json::try_parse(body),
             ResponseBody::Xml(_) => Xml::try_parse(body),
             ResponseBody::Text(_) => {

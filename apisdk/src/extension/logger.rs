@@ -234,6 +234,19 @@ impl Logger {
         }
     }
 
+    /// Log empty response
+    pub fn log_response_empty(&self) {
+        if let Some(level) = self.log_level {
+            log::log!(
+                target: &self.log_target,
+                level,
+                "#[{}] Response Body(Empty) @{}ms",
+                self.request_id,
+                self.start.elapsed().as_millis(),
+            );
+        }
+    }
+
     /// Log response json payload
     pub fn log_response_json(&self, json: &Value) {
         if let Some(level) = self.log_level {
@@ -287,6 +300,7 @@ impl Logger {
     /// Log mock response body
     pub fn log_mock_response_body(&self, body: &ResponseBody) {
         match body {
+            ResponseBody::Empty => self.log_response_empty(),
             ResponseBody::Json(json) => self.log_response_json(json),
             ResponseBody::Xml(xml) => self.log_response_xml(xml),
             ResponseBody::Text(text) => self.log_response_text(text),

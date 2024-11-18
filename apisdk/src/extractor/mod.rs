@@ -17,6 +17,8 @@ use crate::{ApiError, ApiResult};
 /// MimeType (aka. ContentType)
 #[derive(Debug)]
 pub enum MimeType {
+    /// No mime-type
+    Empty,
     /// Json (application/json)
     Json,
     /// Xml (application/xml | text/xml)
@@ -30,6 +32,7 @@ pub enum MimeType {
 impl std::fmt::Display for MimeType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Empty => write!(f, "application/octet-stream"),
             Self::Json => write!(f, "application/json"),
             Self::Xml => write!(f, "application/xml"),
             Self::Text => write!(f, "text/plain"),
@@ -69,6 +72,8 @@ impl From<MimeType> for HeaderValue {
 /// This enum represents the payload of respones
 #[derive(Debug, Clone)]
 pub enum ResponseBody {
+    /// No response
+    Empty,
     /// Json (content-type = application/json)
     Json(Value),
     /// Xml (content-type = text/xml | application/xml)
@@ -81,6 +86,7 @@ impl ResponseBody {
     /// Get the related mime type
     pub fn mime_type(&self) -> MimeType {
         match self {
+            Self::Empty => MimeType::Empty,
             Self::Json(_) => MimeType::Json,
             Self::Xml(_) => MimeType::Xml,
             Self::Text(_) => MimeType::Text,

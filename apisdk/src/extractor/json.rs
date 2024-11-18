@@ -147,6 +147,7 @@ impl TryFrom<ResponseBody> for String {
 
     fn try_from(body: ResponseBody) -> Result<Self, Self::Error> {
         match body {
+            ResponseBody::Empty => Ok("".to_string()),
             ResponseBody::Json(json) => {
                 // Remove __headers__
                 let json = match json {

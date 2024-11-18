@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use http::StatusCode;
 use reqwest::{header::CONTENT_TYPE, Response, ResponseBuilderExt};
 use serde::Serialize;
 use serde_json::Value;
@@ -463,6 +464,7 @@ async fn send_and_unparse(mut req: RequestBuilder, logger: Logger) -> ApiResult<
             Ok(body) => {
                 logger.log_mock_response_body(&body);
                 let (content_type, text) = match body {
+                    ResponseBody::Empty => (MimeType::Empty, "".to_string()),
                     ResponseBody::Json(json) => (MimeType::Json, json.to_string()),
                     ResponseBody::Xml(xml) => (MimeType::Xml, xml),
                     ResponseBody::Text(text) => (MimeType::Text, text),
@@ -530,6 +532,11 @@ async fn send_and_parse(
     } else {
         res
     };
+
+    // Ignore all payload for 204 No Content
+    if res.status() == StatusCode::NO_CONTENT {
+        return Ok(ResponseBody::Empty);
+    }
 
     // Check content-type, and parse payload
     let content_type = res
