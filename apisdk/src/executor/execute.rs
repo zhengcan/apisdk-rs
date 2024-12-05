@@ -390,6 +390,10 @@ where
         let outcome = f.await;
         match outcome.as_ref() {
             Ok(response) => match response {
+                ResponseBody::Empty => {
+                    span.record("resp.type", "empty");
+                    tracing::info!(name = "response", "response.empty",);
+                }
                 ResponseBody::Json(value) => {
                     span.record("resp.type", "json");
                     tracing::info!(
