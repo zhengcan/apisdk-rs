@@ -34,7 +34,7 @@ checksum = "c1fd03a028ef38ba2276dce7e33fcd6369c158a1bca17946c4b1b701891c1ff7"
 
 [[package]]
 name = "apisdk"
-version = "0.0.17"
+version = "0.1.0-beta.1"
 dependencies = [
  "anyhow",
  "apisdk-macros",
@@ -73,7 +73,7 @@ dependencies = [
 
 [[package]]
 name = "apisdk-macros"
-version = "0.0.17"
+version = "0.1.0-beta.1"
 dependencies = [
  "proc-macro2",
  "quote",
