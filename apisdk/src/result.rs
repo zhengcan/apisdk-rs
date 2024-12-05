@@ -53,6 +53,9 @@ pub enum ApiError {
     /// Illegal json
     #[error("Illegal json: {0}")]
     IllegalJson(Value),
+    /// Decode xml error
+    #[error("Illegal xml: {0}")]
+    IllegalXml(#[from] quick_xml::SeError),
     /// Service error
     #[error("Service error: {0} - {1:?}")]
     ServiceError(i64, Option<String>),
@@ -87,7 +90,8 @@ impl ApiError {
             | Self::DecodeJson(..)
             | Self::DecodeXml(..)
             | Self::DecodeText
-            | Self::IllegalJson(..) => 500,
+            | Self::IllegalJson(..)
+            | Self::IllegalXml(..) => 500,
             Self::ServiceError(c, _) => *c as i32,
             Self::Other(..) | Self::Impossible => 500,
         }
